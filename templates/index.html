@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>FEAAM Contact Matcher</title>
+  <link rel="stylesheet" href="/static/style.css"/>
+</head>
+<body>
+
+<header>
+  <div class="header-brand">
+    <div class="brand-dot"></div>
+    <div>
+      <h1>FEAAM Contact Matcher</h1>
+      <span class="brand-sub">Company-based outreach message generator &amp; deduplication</span>
+    </div>
+  </div>
+</header>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!-- ── SECTION 1: MESSAGE GENERATOR ──────────────────────────────────── -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<div class="page-section">
+
+  <div class="section-toolbar">
+    <div class="section-label msg-label">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+      Message Generator
+    </div>
+    <div class="section-hint">
+      Upload your lists → match by company → download personalized messages
+    </div>
+  </div>
+
+  <!-- Upload row -->
+  <div class="upload-grid">
+
+    <!-- Interested List -->
+    <div class="upload-card" id="intCard">
+      <div class="upload-card-header">
+        <div class="upload-tag interested-tag">Interested List</div>
+        <div class="upload-card-hint">People who showed interest (with company names)</div>
+      </div>
+      <div class="drop-zone" id="intDrop"
+           ondragover="onDragOver(event,'intDrop')"
+           ondragleave="onDragLeave('intDrop')"
+           ondrop="onDrop(event,'intFile','intDrop','intMeta')">
+        <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/>
+        </svg>
+        <div class="drop-text">Drop Excel file here or</div>
+        <label class="btn-upload">
+          Browse File
+          <input type="file" accept=".xlsx,.xls" id="intFile" hidden onchange="onFileSelect('intFile','intMeta','intDrop')"/>
+        </label>
+        <div class="file-meta" id="intMeta"></div>
+      </div>
+    </div>
+
+    <!-- Organization List -->
+    <div class="upload-card" id="orgCard">
+      <div class="upload-card-header">
+        <div class="upload-tag org-tag">Organization List</div>
+        <div class="upload-card-hint">People associated with target organizations</div>
+      </div>
+      <div class="drop-zone" id="orgDrop"
+           ondragover="onDragOver(event,'orgDrop')"
+           ondragleave="onDragLeave('orgDrop')"
+           ondrop="onDrop(event,'orgFile','orgDrop','orgMeta')">
+        <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="2" y="7" width="20" height="14" rx="2"/>
+          <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+          <line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/>
+        </svg>
+        <div class="drop-text">Drop Excel file here or</div>
+        <label class="btn-upload">
+          Browse File
+          <input type="file" accept=".xlsx,.xls" id="orgFile" hidden onchange="onFileSelect('orgFile','orgMeta','orgDrop')"/>
+        </label>
+        <div class="file-meta" id="orgMeta"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Template + settings row -->
+  <div class="config-row">
+    <div class="template-block">
+      <label class="config-label">
+        Message Template
+        <span class="config-hint">Use: {first_name} &nbsp;·&nbsp; {name} &nbsp;·&nbsp; {company} &nbsp;·&nbsp; {contacts}</span>
+      </label>
+      <textarea id="msgTemplate" rows="3">Hi {first_name}, I wanted to reach out to you at {company}. We have previously connected with {contacts} from your company as part of our FEAAM outreach.</textarea>
+    </div>
+    <div class="fuzzy-block">
+      <label class="config-label">
+        Fuzzy Match Threshold
+        <span class="config-hint">Lower = more lenient company matching</span>
+      </label>
+      <div class="fuzzy-row">
+        <input type="range" id="fuzzySlider" min="50" max="100" value="80" oninput="document.getElementById('fuzzyVal').textContent=this.value+'%'"/>
+        <span class="fuzzy-num" id="fuzzyVal">80%</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div class="action-row">
+    <button class="btn-primary" onclick="runPreview()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      Preview Results
+    </button>
+    <button class="btn-success" id="msgDownloadBtn" disabled onclick="runGenerate()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      Download Excel
+    </button>
+  </div>
+
+  <!-- Status / error -->
+  <div id="msgStatus" class="status-bar hidden"></div>
+
+  <!-- Preview results -->
+  <div id="msgPreviewArea" class="hidden">
+    <div class="preview-stats" id="msgStats"></div>
+    <div class="table-wrap">
+      <table id="msgTable" class="data-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Company (Org List)</th>
+            <th>Matched Company</th>
+            <th>Match</th>
+            <th>Previous Contacts</th>
+            <th>Message</th>
+          </tr>
+        </thead>
+        <tbody id="msgTbody"></tbody>
+      </table>
+    </div>
+    <div class="table-note" id="msgNote"></div>
+  </div>
+
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!-- ── SECTION 2: DEDUPLICATION ───────────────────────────────────────── -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<div class="page-section dedup-section">
+
+  <div class="section-toolbar">
+    <div class="section-label dedup-label">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        <line x1="8" y1="11" x2="14" y2="11"/>
+      </svg>
+      Deduplication
+    </div>
+    <div class="section-hint">
+      Check your reference sheet against other files — find and flag duplicates
+    </div>
+  </div>
+
+  <div class="upload-grid">
+
+    <!-- Reference sheet -->
+    <div class="upload-card" id="refCard">
+      <div class="upload-card-header">
+        <div class="upload-tag ref-tag">Reference Sheet</div>
+        <div class="upload-card-hint">The master list to check against</div>
+      </div>
+      <div class="drop-zone" id="refDrop"
+           ondragover="onDragOver(event,'refDrop')"
+           ondragleave="onDragLeave('refDrop')"
+           ondrop="onDrop(event,'refFile','refDrop','refMeta')">
+        <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+        </svg>
+        <div class="drop-text">Drop reference Excel or</div>
+        <label class="btn-upload">
+          Browse File
+          <input type="file" accept=".xlsx,.xls" id="refFile" hidden onchange="onFileSelect('refFile','refMeta','refDrop')"/>
+        </label>
+        <div class="file-meta" id="refMeta"></div>
+      </div>
+    </div>
+
+    <!-- Other sheets (multi) -->
+    <div class="upload-card" id="othersCard">
+      <div class="upload-card-header">
+        <div class="upload-tag others-tag">Other Sheets</div>
+        <div class="upload-card-hint">One or more files to check for duplicates</div>
+      </div>
+      <div class="drop-zone multi-drop" id="othersDrop"
+           ondragover="onDragOver(event,'othersDrop')"
+           ondragleave="onDragLeave('othersDrop')"
+           ondrop="onDropMulti(event,'othersFiles','othersDrop','othersMeta')">
+        <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M16 16l-4-4-4 4"/><path d="M12 12v9"/>
+          <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+        </svg>
+        <div class="drop-text">Drop one or more Excel files or</div>
+        <label class="btn-upload">
+          Browse Files
+          <input type="file" accept=".xlsx,.xls" id="othersFiles" hidden multiple onchange="onMultiFileSelect('othersFiles','othersMeta','othersDrop')"/>
+        </label>
+        <div class="file-meta" id="othersMeta"></div>
+        <div id="othersFileList" class="file-list"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Actions -->
+  <div class="action-row">
+    <button class="btn-primary" onclick="runDedupPreview()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      Check Duplicates
+    </button>
+    <button class="btn-danger" id="dedupDownloadBtn" disabled onclick="runDedupDownload()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      Download Result
+    </button>
+  </div>
+
+  <div id="dedupStatus" class="status-bar hidden"></div>
+
+  <!-- Dedup results -->
+  <div id="dedupPreviewArea" class="hidden">
+    <div class="preview-stats" id="dedupStats"></div>
+    <div id="dedupDupArea" class="hidden">
+      <div class="dup-list-title">Duplicate entries found:</div>
+      <div class="table-wrap">
+        <table id="dedupTable" class="data-table">
+          <thead>
+            <tr><th>Name</th><th>Email</th><th>Match Reason</th></tr>
+          </thead>
+          <tbody id="dedupTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<footer>FEAAM Contact Matcher · Company-based message generation &amp; deduplication</footer>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
