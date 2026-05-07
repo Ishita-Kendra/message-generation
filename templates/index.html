@@ -19,7 +19,47 @@
 </header>
 
 <!-- ══════════════════════════════════════════════════════════════════════ -->
-<!-- ── SECTION 1: MESSAGE GENERATOR ──────────────────────────────────── -->
+<!-- ── REFERENCE FILES ────────────────────────────────────────────────── -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<div class="page-section ref-section">
+
+  <div class="section-toolbar">
+    <div class="section-label ref-label">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+      </svg>
+      Reference Files
+    </div>
+    <div class="section-hint">All uploaded files are stored here permanently — use them in any section below</div>
+    <label class="btn-add-ref">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Add Files
+      <input type="file" accept=".xlsx,.xls" id="refAddInput" hidden multiple onchange="uploadRefFiles(this)"/>
+    </label>
+  </div>
+
+  <!-- Drop zone for reference files -->
+  <div class="ref-dropzone" id="refGlobalDrop"
+       ondragover="onRefDragOver(event)"
+       ondragleave="onRefDragLeave()"
+       ondrop="onRefDrop(event)">
+    <div id="refFileGrid" class="ref-file-grid">
+      <div class="ref-empty" id="refEmpty">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+        </svg>
+        <div>No files yet — drop Excel files here or click <strong>Add Files</strong></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!-- ── MESSAGE GENERATOR ─────────────────────────────────────────────── -->
 <!-- ══════════════════════════════════════════════════════════════════════ -->
 <div class="page-section">
 
@@ -30,86 +70,75 @@
       </svg>
       Message Generator
     </div>
-    <div class="section-hint">
-      Upload your lists → match by company → download personalized messages
-    </div>
+    <div class="section-hint">Match by company name → generate personalized messages → export Excel</div>
   </div>
 
-  <!-- Upload row -->
   <div class="upload-grid">
 
     <!-- Interested List -->
-    <div class="upload-card" id="intCard">
+    <div class="upload-card">
       <div class="upload-card-header">
         <div class="upload-tag interested-tag">Interested List</div>
         <div class="upload-card-hint">People who showed interest (with company names)</div>
       </div>
-      <div class="drop-zone" id="intDrop"
-           ondragover="onDragOver(event,'intDrop')"
-           ondragleave="onDragLeave('intDrop')"
-           ondrop="onDrop(event,'intFile','intDrop','intMeta')">
-        <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-          <polyline points="14 2 14 8 20 8"/>
-          <line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/>
-        </svg>
-        <div class="drop-text">Drop Excel file here or</div>
-        <label class="btn-upload">
-          Browse File
-          <input type="file" accept=".xlsx,.xls" id="intFile" hidden onchange="onFileSelect('intFile','intMeta','intDrop')"/>
-        </label>
-        <div class="file-meta" id="intMeta"></div>
+      <div class="file-select-body">
+        <div class="ref-select-wrap">
+          <select id="intRefSelect" class="ref-select" onchange="onRefSelectChange('intRefSelect','intDrop','intMeta')">
+            <option value="">— Select from Reference Files —</option>
+          </select>
+        </div>
+        <div class="or-divider">or upload new</div>
+        <div class="drop-zone" id="intDrop"
+             ondragover="onDragOver(event,'intDrop')"
+             ondragleave="onDragLeave('intDrop')"
+             ondrop="onDrop(event,'intFile','intDrop','intMeta')">
+          <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/>
+          </svg>
+          <div class="drop-text">Drop Excel or</div>
+          <label class="btn-upload">Browse
+            <input type="file" accept=".xlsx,.xls" id="intFile" hidden onchange="onFileSelect('intFile','intMeta','intDrop','intRefSelect')"/>
+          </label>
+          <div class="file-meta" id="intMeta"></div>
+        </div>
       </div>
     </div>
 
     <!-- Organization List -->
-    <div class="upload-card" id="orgCard">
+    <div class="upload-card">
       <div class="upload-card-header">
         <div class="upload-tag org-tag">Organization List</div>
         <div class="upload-card-hint">People associated with target organizations</div>
       </div>
-      <div class="drop-zone" id="orgDrop"
-           ondragover="onDragOver(event,'orgDrop')"
-           ondragleave="onDragLeave('orgDrop')"
-           ondrop="onDrop(event,'orgFile','orgDrop','orgMeta')">
-        <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <rect x="2" y="7" width="20" height="14" rx="2"/>
-          <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
-          <line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/>
-        </svg>
-        <div class="drop-text">Drop Excel file here or</div>
-        <label class="btn-upload">
-          Browse File
-          <input type="file" accept=".xlsx,.xls" id="orgFile" hidden onchange="onFileSelect('orgFile','orgMeta','orgDrop')"/>
-        </label>
-        <div class="file-meta" id="orgMeta"></div>
+      <div class="file-select-body">
+        <div class="ref-select-wrap">
+          <select id="orgRefSelect" class="ref-select" onchange="onRefSelectChange('orgRefSelect','orgDrop','orgMeta')">
+            <option value="">— Select from Reference Files —</option>
+          </select>
+        </div>
+        <div class="or-divider">or upload new</div>
+        <div class="drop-zone" id="orgDrop"
+             ondragover="onDragOver(event,'orgDrop')"
+             ondragleave="onDragLeave('orgDrop')"
+             ondrop="onDrop(event,'orgFile','orgDrop','orgMeta')">
+          <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="2" y="7" width="20" height="14" rx="2"/>
+            <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+            <line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/>
+          </svg>
+          <div class="drop-text">Drop Excel or</div>
+          <label class="btn-upload">Browse
+            <input type="file" accept=".xlsx,.xls" id="orgFile" hidden onchange="onFileSelect('orgFile','orgMeta','orgDrop','orgRefSelect')"/>
+          </label>
+          <div class="file-meta" id="orgMeta"></div>
+        </div>
       </div>
     </div>
 
   </div>
 
-  <!-- Template + settings row -->
-  <div class="config-row">
-    <div class="template-block">
-      <label class="config-label">
-        Message Template
-        <span class="config-hint">Use: {first_name} &nbsp;·&nbsp; {name} &nbsp;·&nbsp; {company} &nbsp;·&nbsp; {contacts}</span>
-      </label>
-      <textarea id="msgTemplate" rows="3">Hi {first_name}, I wanted to reach out to you at {company}. We have previously connected with {contacts} from your company as part of our FEAAM outreach.</textarea>
-    </div>
-    <div class="fuzzy-block">
-      <label class="config-label">
-        Fuzzy Match Threshold
-        <span class="config-hint">Lower = more lenient company matching</span>
-      </label>
-      <div class="fuzzy-row">
-        <input type="range" id="fuzzySlider" min="50" max="100" value="80" oninput="document.getElementById('fuzzyVal').textContent=this.value+'%'"/>
-        <span class="fuzzy-num" id="fuzzyVal">80%</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- Actions -->
   <div class="action-row">
     <button class="btn-primary" onclick="runPreview()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -126,24 +155,16 @@
     </button>
   </div>
 
-  <!-- Status / error -->
   <div id="msgStatus" class="status-bar hidden"></div>
 
-  <!-- Preview results -->
   <div id="msgPreviewArea" class="hidden">
     <div class="preview-stats" id="msgStats"></div>
     <div class="table-wrap">
-      <table id="msgTable" class="data-table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Company (Org List)</th>
-            <th>Matched Company</th>
-            <th>Match</th>
-            <th>Previous Contacts</th>
-            <th>Message</th>
-          </tr>
-        </thead>
+      <table class="data-table">
+        <thead><tr>
+          <th>Name</th><th>Company (Org List)</th><th>Matched Company</th>
+          <th>Match</th><th>Previous Contacts</th><th>Message</th>
+        </tr></thead>
         <tbody id="msgTbody"></tbody>
       </table>
     </div>
@@ -154,7 +175,7 @@
 
 
 <!-- ══════════════════════════════════════════════════════════════════════ -->
-<!-- ── SECTION 2: DEDUPLICATION ───────────────────────────────────────── -->
+<!-- ── DEDUPLICATION ─────────────────────────────────────────────────── -->
 <!-- ══════════════════════════════════════════════════════════════════════ -->
 <div class="page-section dedup-section">
 
@@ -166,63 +187,73 @@
       </svg>
       Deduplication
     </div>
-    <div class="section-hint">
-      Check your reference sheet against other files — find and flag duplicates
-    </div>
+    <div class="section-hint">Check your reference sheet against other files — find and flag duplicates</div>
   </div>
 
   <div class="upload-grid">
 
     <!-- Reference sheet -->
-    <div class="upload-card" id="refCard">
+    <div class="upload-card">
       <div class="upload-card-header">
         <div class="upload-tag ref-tag">Reference Sheet</div>
         <div class="upload-card-hint">The master list to check against</div>
       </div>
-      <div class="drop-zone" id="refDrop"
-           ondragover="onDragOver(event,'refDrop')"
-           ondragleave="onDragLeave('refDrop')"
-           ondrop="onDrop(event,'refFile','refDrop','refMeta')">
-        <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-          <polyline points="14 2 14 8 20 8"/>
-        </svg>
-        <div class="drop-text">Drop reference Excel or</div>
-        <label class="btn-upload">
-          Browse File
-          <input type="file" accept=".xlsx,.xls" id="refFile" hidden onchange="onFileSelect('refFile','refMeta','refDrop')"/>
-        </label>
-        <div class="file-meta" id="refMeta"></div>
+      <div class="file-select-body">
+        <div class="ref-select-wrap">
+          <select id="dedupRefSelect" class="ref-select" onchange="onRefSelectChange('dedupRefSelect','dedupRefDrop','dedupRefMeta')">
+            <option value="">— Select from Reference Files —</option>
+          </select>
+        </div>
+        <div class="or-divider">or upload new</div>
+        <div class="drop-zone" id="dedupRefDrop"
+             ondragover="onDragOver(event,'dedupRefDrop')"
+             ondragleave="onDragLeave('dedupRefDrop')"
+             ondrop="onDrop(event,'dedupRefFile','dedupRefDrop','dedupRefMeta')">
+          <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+          </svg>
+          <div class="drop-text">Drop Excel or</div>
+          <label class="btn-upload">Browse
+            <input type="file" accept=".xlsx,.xls" id="dedupRefFile" hidden onchange="onFileSelect('dedupRefFile','dedupRefMeta','dedupRefDrop','dedupRefSelect')"/>
+          </label>
+          <div class="file-meta" id="dedupRefMeta"></div>
+        </div>
       </div>
     </div>
 
-    <!-- Other sheets (multi) -->
-    <div class="upload-card" id="othersCard">
+    <!-- Other sheets -->
+    <div class="upload-card">
       <div class="upload-card-header">
         <div class="upload-tag others-tag">Other Sheets</div>
-        <div class="upload-card-hint">One or more files to check for duplicates</div>
+        <div class="upload-card-hint">Files to check for duplicates (multi-select from reference or upload)</div>
       </div>
-      <div class="drop-zone multi-drop" id="othersDrop"
-           ondragover="onDragOver(event,'othersDrop')"
-           ondragleave="onDragLeave('othersDrop')"
-           ondrop="onDropMulti(event,'othersFiles','othersDrop','othersMeta')">
-        <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <path d="M16 16l-4-4-4 4"/><path d="M12 12v9"/>
-          <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
-        </svg>
-        <div class="drop-text">Drop one or more Excel files or</div>
-        <label class="btn-upload">
-          Browse Files
-          <input type="file" accept=".xlsx,.xls" id="othersFiles" hidden multiple onchange="onMultiFileSelect('othersFiles','othersMeta','othersDrop')"/>
-        </label>
-        <div class="file-meta" id="othersMeta"></div>
-        <div id="othersFileList" class="file-list"></div>
+      <div class="file-select-body">
+        <div class="ref-select-wrap multi-ref-wrap">
+          <div class="multi-ref-label">Select from Reference Files:</div>
+          <div id="othersRefChecklist" class="ref-checklist"></div>
+        </div>
+        <div class="or-divider">or upload new</div>
+        <div class="drop-zone multi-drop" id="othersDrop"
+             ondragover="onDragOver(event,'othersDrop')"
+             ondragleave="onDragLeave('othersDrop')"
+             ondrop="onDropMulti(event,'othersFiles','othersDrop','othersMeta')">
+          <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M16 16l-4-4-4 4"/><path d="M12 12v9"/>
+            <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+          </svg>
+          <div class="drop-text">Drop one or more files or</div>
+          <label class="btn-upload">Browse
+            <input type="file" accept=".xlsx,.xls" id="othersFiles" hidden multiple onchange="onMultiFileSelect('othersFiles','othersMeta','othersDrop')"/>
+          </label>
+          <div class="file-meta" id="othersMeta"></div>
+          <div id="othersFileList" class="file-list"></div>
+        </div>
       </div>
     </div>
 
   </div>
 
-  <!-- Actions -->
   <div class="action-row">
     <button class="btn-primary" onclick="runDedupPreview()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -241,16 +272,13 @@
 
   <div id="dedupStatus" class="status-bar hidden"></div>
 
-  <!-- Dedup results -->
   <div id="dedupPreviewArea" class="hidden">
     <div class="preview-stats" id="dedupStats"></div>
     <div id="dedupDupArea" class="hidden">
       <div class="dup-list-title">Duplicate entries found:</div>
       <div class="table-wrap">
-        <table id="dedupTable" class="data-table">
-          <thead>
-            <tr><th>Name</th><th>Email</th><th>Match Reason</th></tr>
-          </thead>
+        <table class="data-table">
+          <thead><tr><th>Name</th><th>Email</th><th>Match Reason</th></tr></thead>
           <tbody id="dedupTbody"></tbody>
         </table>
       </div>
@@ -259,7 +287,7 @@
 
 </div>
 
-<footer>FEAAM Contact Matcher · Company-based message generation &amp; deduplication</footer>
+<footer>FEAAM Contact Matcher · Files persist between sessions · Powered by Flask + pandas</footer>
 
 <script src="/static/app.js"></script>
 </body>
