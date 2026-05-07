@@ -314,14 +314,18 @@ function renderMsgPreview(data) {
                 : row.match_type === 'exact' ? '<span class="badge badge-exact">Exact</span>'
                 : `<span class="badge badge-fuzzy">${esc(row.match_type)}</span>`;
     return `<tr class="${row.has_match ? 'row-match' : ''}">
-      <td>${esc(row.name)}</td><td>${esc(row.company)}</td>
-      <td>${esc(row.matched_company)}</td><td>${badge}</td>
-      <td>${esc(row.contacts)}</td><td>${esc(row.message)}</td>
+      <td>${esc(row.int_name)}</td>
+      <td>${esc(row.company)}</td>
+      <td>${esc(row.new_name)}</td>
+      <td style="max-width:180px">${esc(row.new_title)}</td>
+      <td>${badge}</td>
+      <td>${esc(row.subject)}</td>
+      <td style="color:var(--muted2);font-style:italic">${esc(row.body_short)}</td>
     </tr>`;
   }).join('');
   document.getElementById('msgNote').textContent = data.total > 100
-    ? `Showing first 100 of ${data.total} rows. Download Excel to see all.`
-    : `Showing all ${data.total} rows.`;
+    ? `Showing first 100 of ${data.total} rows. Download Excel for full messages.`
+    : `Showing all ${data.total} rows. Download Excel for full messages.`;
   document.getElementById('msgPreviewArea').classList.remove('hidden');
 }
 

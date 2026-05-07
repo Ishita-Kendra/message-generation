@@ -7,12 +7,151 @@ from openpyxl.utils import get_column_letter
 from rapidfuzz import fuzz, process as rfprocess
 
 app = Flask(__name__)
-app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024  # 32 MB
+app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024
 
-REFERENCE_DIR = os.path.join(os.path.dirname(__file__), 'reference_files')
-MANIFEST_PATH = os.path.join(REFERENCE_DIR, '_manifest.json')
-
+REFERENCE_DIR  = os.path.join(os.path.dirname(__file__), 'reference_files')
+MANIFEST_PATH  = os.path.join(REFERENCE_DIR, '_manifest.json')
 os.makedirs(REFERENCE_DIR, exist_ok=True)
+
+OUTPUT_COLUMNS = [
+    'Interested Person Contacted',
+    'Interested Person Title',
+    'Interested Person Location',
+    'Interested Person Email',
+    'Company',
+    'New Contact Name',
+    'New Contact Title',
+    'New Contact Email',
+    'New Contact Location',
+    'Main Body Subject',
+    'Main Body',
+    'Follow-up Subject',
+    'Follow-up Body',
+    'Notes / Flags',
+]
+
+# ── Executive / title-level detection ────────────────────────────────────────
+
+EXEC_KEYWORDS = {
+    'president','ceo','cto','cfo','coo','cso','chief','founder','owner',
+    'partner','chairman','board','executive','evp','svp','vice president',
+    'director','head of','vp',
+}
+MGMT_KEYWORDS = {
+    'manager','lead','coordinator','program','project','strategy',
+    'operations','business development','account','commercial',
+}
+
+def contact_level(title):
+    """Return 'exec', 'mgmt', or 'tech' based on title keywords."""
+    if not title:
+        return 'mgmt'
+    t = title.lower()
+    if any(k in t for k in EXEC_KEYWORDS):
+        return 'exec'
+    if any(k in t for k in MGMT_KEYWORDS):
+        return 'mgmt'
+    return 'tech'
+
+
+# ── FEAAM message generation ──────────────────────────────────────────────────
+
+def generate_subject(company, new_contact_title, contact_index):
+    level = contact_level(new_contact_title)
+    if contact_index == 0:
+        return f"Continuing FEAAM's discussion at {company}"
+    if level == 'exec':
+        return f"Continuing FEAAM’s discussion at {company}"
+    if level == 'tech':
+        return f"Reduced rare-earth magnet mass for {company}’s applications"
+    return f"FEAAM × {company} — parallel touchpoint"
+
+
+def generate_main_body(new_first, new_title, company,
+                       int_name, int_title, int_location, contact_index):
+    level  = contact_level(new_title)
+    level2 = contact_level(new_title)
+
+    loc_bit = f", based in {int_location}," if int_location else ","
+    title_bit = f", {int_title}" if int_title else ""
+    role_bit = f"Given your role as {new_title}, the topic may be of interest." if new_title else \
+               "The topic may be of interest at the strategic level."
+
+    if level == 'exec' or contact_index == 0:
+        body = (
+            f"Hi {new_first},\n\n"
+            f"We’ve recently been in contact with your colleague {int_name}{title_bit}"
+            f"{loc_bit} regarding FEAAM’s patented stator flux barrier motor architecture, "
+            f"which reduces rare-earth magnet mass while maintaining or improving torque density "
+            f"and efficiency.\n\n"
+            f"{role_bit}\n\n"
+            f"Our architecture has been evaluated across applications ranging from material handling "
+            f"to aerospace, supported by advanced electromagnetic simulation and optimization tools "
+            f"developed in-house at FEAAM (a spin-off of Bundeswehr University Munich).\n\n"
+            f"If useful, we’d be glad to share a complimentary Technical Analysis aligned with "
+            f"{company}’s motor requirements.\n\n"
+            f"Best regards,\nProf. Dr.-Ing. Dieter Gerling\nFounder, FEAAM GmbH"
+        )
+    elif level == 'mgmt':
+        body = (
+            f"Hi {new_first},\n\n"
+            f"{int_name}{title_bit} (based in {int_location}), has recently engaged with us on "
+            f"FEAAM’s patented stator flux barrier motor architecture, which reduces rare-earth "
+            f"magnet mass while maintaining or improving torque density and efficiency under identical "
+            f"electrical and geometrical boundary conditions.\n\n"
+            f"In your role as {new_title}, the practical implications may be of direct relevance.\n\n"
+            f"Our architecture has been evaluated across applications ranging from material handling "
+            f"to aerospace, supported by advanced electromagnetic simulation and optimization tools "
+            f"developed in-house at FEAAM (a spin-off of Bundeswehr University Munich).\n\n"
+            f"If useful, we’d be glad to share a complimentary Technical Analysis aligned with "
+            f"{company}’s motor requirements.\n\n"
+            f"Best regards,\nProf. Dr.-Ing. Dieter Gerling\nFounder, FEAAM GmbH"
+        )
+    else:  # tech
+        body = (
+            f"Hi {new_first},\n\n"
+            f"FEAAM’s patented stator flux barrier motor architecture reduces rare-earth magnet "
+            f"mass while maintaining or improving torque density and efficiency under identical "
+            f"electrical and geometrical boundary conditions.\n\n"
+            f"Your colleague {int_name}{title_bit} has recently engaged with us on this topic. "
+            f"Given your background in {new_title}, the architecture’s design and simulation "
+            f"methodology may be of direct technical interest.\n\n"
+            f"We’ve evaluated it across applications ranging from material handling to aerospace "
+            f"and can share a complimentary Technical Analysis scoped to {company}’s requirements.\n\n"
+            f"Best regards,\nProf. Dr.-Ing. Dieter Gerling\nFounder, FEAAM GmbH"
+        )
+    return body
+
+
+def generate_followup(new_first, company, int_first, new_title, contact_index):
+    level = contact_level(new_title)
+
+    if level == 'exec' or contact_index == 0:
+        body = (
+            f"Hi {new_first},\n\n"
+            f"Following up briefly on my earlier note. Given the parallel discussion with {int_first}, "
+            f"the Technical Analysis can be reviewed alongside that thread without overlap.\n\n"
+            f"Worth a brief look on your side?\n\n"
+            f"Best regards,\nProf. Dr.-Ing. Dieter Gerling\nFounder, FEAAM GmbH"
+        )
+    elif level == 'mgmt':
+        body = (
+            f"Hi {new_first},\n\n"
+            f"A short bump on my previous note. The Technical Analysis is intended as a low-effort "
+            f"starting point for internal discussion and can be reviewed alongside {int_first}’s "
+            f"thread without overlap.\n\n"
+            f"Worth a brief look on your side?\n\n"
+            f"Best regards,\nProf. Dr.-Ing. Dieter Gerling\nFounder, FEAAM GmbH"
+        )
+    else:  # tech
+        body = (
+            f"Hi {new_first},\n\n"
+            f"Following up briefly. The architecture is patented and proven, with applications "
+            f"evaluated across multiple drive contexts overlapping {company}’s portfolio.\n\n"
+            f"Worth a brief look on your side?\n\n"
+            f"Best regards,\nProf. Dr.-Ing. Dieter Gerling\nFounder, FEAAM GmbH"
+        )
+    return body
 
 
 # ── Manifest helpers ──────────────────────────────────────────────────────────
@@ -30,22 +169,14 @@ def save_manifest(manifest):
 
 
 def save_to_reference(file_obj, original_name):
-    """Save an uploaded file to the reference directory. Returns entry dict."""
     manifest = load_manifest()
-
-    # Sanitize filename
     safe_name = re.sub(r'[^\w.\-]', '_', original_name)
     dest_path = os.path.join(REFERENCE_DIR, safe_name)
-
-    # Read content
     file_obj.seek(0)
     content = file_obj.read()
     file_obj.seek(0)
-
     with open(dest_path, 'wb') as f:
         f.write(content)
-
-    # Update manifest (upsert by filename)
     entry = {
         'name': safe_name,
         'original_name': original_name,
@@ -62,9 +193,8 @@ def save_to_reference(file_obj, original_name):
 
 @app.route('/api/reference-files', methods=['GET'])
 def list_reference_files():
-    manifest = load_manifest()
-    # Sort newest first
-    manifest.sort(key=lambda e: e.get('uploaded_at', ''), reverse=True)
+    manifest = sorted(load_manifest(),
+                      key=lambda e: e.get('uploaded_at', ''), reverse=True)
     return jsonify({'ok': True, 'files': manifest})
 
 
@@ -73,25 +203,19 @@ def upload_reference_file():
     files = request.files.getlist('files')
     if not files:
         return jsonify({'ok': False, 'error': 'No files provided'}), 400
-    saved = []
-    for f in files:
-        if f.filename:
-            entry = save_to_reference(f, f.filename)
-            saved.append(entry)
+    saved = [save_to_reference(f, f.filename) for f in files if f.filename]
     return jsonify({'ok': True, 'saved': saved})
 
 
 @app.route('/api/reference-files/<filename>', methods=['DELETE'])
 def delete_reference_file(filename):
     manifest = load_manifest()
-    entry = next((e for e in manifest if e['name'] == filename), None)
-    if not entry:
+    if not any(e['name'] == filename for e in manifest):
         return jsonify({'ok': False, 'error': 'File not found'}), 404
     path = os.path.join(REFERENCE_DIR, filename)
     if os.path.exists(path):
         os.remove(path)
-    manifest = [e for e in manifest if e['name'] != filename]
-    save_manifest(manifest)
+    save_manifest([e for e in manifest if e['name'] != filename])
     return jsonify({'ok': True})
 
 
@@ -103,13 +227,13 @@ def get_reference_file(filename):
     return send_file(path, as_attachment=True)
 
 
-# ── Utilities ─────────────────────────────────────────────────────────────────
+# ── Column detection helpers ──────────────────────────────────────────────────
 
 COMPANY_SUFFIXES = {
-    'inc', 'llc', 'ltd', 'corp', 'co', 'gmbh', 'ag', 'sa', 'plc',
-    'limited', 'incorporated', 'corporation', 'company', 'group',
-    'holding', 'holdings', 'enterprises', 'solutions', 'services',
-    'international', 'global', 'worldwide', 'consulting', 'the',
+    'inc','llc','ltd','corp','co','gmbh','ag','sa','plc','limited',
+    'incorporated','corporation','company','group','holding','holdings',
+    'enterprises','solutions','services','international','global',
+    'worldwide','consulting','the',
 }
 
 
@@ -118,8 +242,7 @@ def clean_company(name):
         return ''
     s = name.lower().strip()
     s = re.sub(r'[.,&\-/\\]+', ' ', s)
-    words = [w for w in s.split() if w not in COMPANY_SUFFIXES]
-    return ' '.join(words).strip()
+    return ' '.join(w for w in s.split() if w not in COMPANY_SUFFIXES).strip()
 
 
 def find_col(df, *keywords):
@@ -172,6 +295,12 @@ def read_excel_from_path(path):
         return pd.read_excel(path)
 
 
+def open_file(src):
+    if isinstance(src, str):
+        return read_excel_from_path(os.path.join(REFERENCE_DIR, src))
+    return read_excel(src)
+
+
 def format_contacts(contacts):
     if not contacts:
         return ''
@@ -182,22 +311,14 @@ def format_contacts(contacts):
     return ', '.join(contacts[:-1]) + f', and {contacts[-1]}'
 
 
-DEFAULT_TEMPLATE = (
-    "Hi {first_name}, I wanted to reach out to you at {company}. "
-    "We have previously connected with {contacts} from your company "
-    "as part of our FEAAM outreach."
-)
-
-
-def build_msg(first, name, company, contacts):
-    return (DEFAULT_TEMPLATE
-            .replace('{first_name}', first or 'there')
-            .replace('{name}', name or '')
-            .replace('{company}', company or '')
-            .replace('{contacts}', contacts))
-
+# ── Build detailed company map ────────────────────────────────────────────────
 
 def build_company_map(df, co_col):
+    """company_key → {display, contacts:[{name,title,location,email}]}"""
+    title_col = find_col(df, 'title', 'position', 'role', 'designation', 'jobtitle')
+    loc_col   = find_col(df, 'location', 'city', 'country', 'region', 'address')
+    email_col = find_col(df, 'email', 'mail')
+
     co_map = {}
     for _, row in df.iterrows():
         co_raw = safe_str(row.get(co_col, ''))
@@ -209,89 +330,149 @@ def build_company_map(df, co_col):
         name = extract_name(row, df)
         if not name:
             continue
+        contact = {
+            'name':     name,
+            'title':    safe_str(row.get(title_col, '')) if title_col else '',
+            'location': safe_str(row.get(loc_col,   '')) if loc_col   else '',
+            'email':    safe_str(row.get(email_col,  '')) if email_col  else '',
+        }
         if co_key not in co_map:
             co_map[co_key] = {'display': co_raw, 'contacts': []}
-        if name not in co_map[co_key]['contacts']:
-            co_map[co_key]['contacts'].append(name)
+        if not any(c['name'] == name for c in co_map[co_key]['contacts']):
+            co_map[co_key]['contacts'].append(contact)
     return co_map
 
 
 def lookup_company(co_raw, co_map, fuzzy_thresh=80):
     co_key = clean_company(co_raw)
     if not co_key:
-        return [], '', 'none'
+        return None, 'none'
     if co_key in co_map:
-        return co_map[co_key]['contacts'], co_map[co_key]['display'], 'exact'
+        return co_map[co_key], 'exact'
     if co_map:
-        res = rfprocess.extractOne(co_key, list(co_map.keys()), scorer=fuzz.token_sort_ratio)
+        res = rfprocess.extractOne(co_key, list(co_map.keys()),
+                                   scorer=fuzz.token_sort_ratio)
         if res and res[1] >= fuzzy_thresh:
-            return co_map[res[0]]['contacts'], co_map[res[0]]['display'], f'fuzzy ({res[1]}%)'
-    return [], '', 'none'
+            return co_map[res[0]], f'fuzzy ({res[1]}%)'
+    return None, 'none'
 
 
-def open_file(file_obj_or_name):
-    """Accept either an uploaded FileStorage or a reference filename string."""
-    if isinstance(file_obj_or_name, str):
-        path = os.path.join(REFERENCE_DIR, file_obj_or_name)
-        return read_excel_from_path(path)
-    return read_excel(file_obj_or_name)
+# ── Core matching logic ───────────────────────────────────────────────────────
+
+def build_output_rows(int_df, org_df):
+    int_co_col = find_col(int_df, 'company','organization','org','employer','firm','account')
+    org_co_col = find_col(org_df, 'company','organization','org','employer','firm','account')
+
+    if not int_co_col:
+        raise ValueError(f'No company column in Interested list. Found: {list(int_df.columns)}')
+    if not org_co_col:
+        raise ValueError(f'No company column in Organization list. Found: {list(org_df.columns)}')
+
+    org_title_col = find_col(org_df, 'title','position','role','designation','jobtitle')
+    org_loc_col   = find_col(org_df, 'location','city','country','region','address')
+    org_email_col = find_col(org_df, 'email','mail')
+
+    co_map = build_company_map(int_df, int_co_col)
+
+    # Track how many new contacts we've generated per company (for subject variation)
+    company_contact_count = {}
+    rows_out = []
+
+    for _, row in org_df.iterrows():
+        co_raw   = safe_str(row.get(org_co_col, ''))
+        new_name = extract_name(row, org_df)
+        new_first = new_name.split()[0] if new_name else 'there'
+        new_title = safe_str(row.get(org_title_col, '')) if org_title_col else ''
+        new_email = safe_str(row.get(org_email_col, '')) if org_email_col else ''
+        new_loc   = safe_str(row.get(org_loc_col,   '')) if org_loc_col   else ''
+
+        entry, match_type = lookup_company(co_raw, co_map)
+
+        if entry is None:
+            rows_out.append({
+                'int_name': '', 'int_title': '', 'int_location': '', 'int_email': '',
+                'company': co_raw,
+                'new_name': new_name, 'new_title': new_title,
+                'new_email': new_email, 'new_location': new_loc,
+                'subject': '', 'body': '', 'fu_subject': '', 'fu_body': '',
+                'notes': '', 'match_type': 'none', 'has_match': False,
+            })
+            continue
+
+        interested = entry['contacts']  # list of {name,title,location,email}
+        company_display = co_raw or entry['display']
+
+        # Use primary interested contact for column data; mention all in message
+        primary = interested[0]
+        int_names_str = format_contacts([c['name'] for c in interested])
+
+        co_key = clean_company(co_raw) or clean_company(entry['display'])
+        idx = company_contact_count.get(co_key, 0)
+        company_contact_count[co_key] = idx + 1
+
+        subject    = generate_subject(company_display, new_title, idx)
+        main_body  = generate_main_body(
+            new_first, new_title, company_display,
+            int_names_str, primary['title'], primary['location'], idx
+        )
+        fu_subject = f"Re: {subject}"
+        fu_body    = generate_followup(
+            new_first, company_display,
+            primary['name'].split()[0], new_title, idx
+        )
+
+        rows_out.append({
+            'int_name':     int_names_str,
+            'int_title':    primary['title'],
+            'int_location': primary['location'],
+            'int_email':    primary['email'],
+            'company':      company_display,
+            'new_name':     new_name,
+            'new_title':    new_title,
+            'new_email':    new_email,
+            'new_location': new_loc,
+            'subject':      subject,
+            'body':         main_body,
+            'fu_subject':   fu_subject,
+            'fu_body':      fu_body,
+            'notes':        '',
+            'match_type':   match_type,
+            'has_match':    True,
+        })
+
+    return rows_out
 
 
-# ── Styling helpers ───────────────────────────────────────────────────────────
-
-def style_header(ws, ncols):
-    fill = PatternFill(start_color='111520', end_color='111520', fill_type='solid')
-    font = Font(color='E4E8F4', bold=True)
-    for i in range(1, ncols + 1):
-        c = ws.cell(row=1, column=i)
-        c.fill = fill
-        c.font = font
-        c.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
-    ws.row_dimensions[1].height = 22
-
-
-def auto_width(ws, df):
-    for i, col in enumerate(df.columns, 1):
-        sample = [str(col)] + [str(df.iloc[r, i - 1]) for r in range(min(20, len(df)))]
-        best = max(len(s) for s in sample)
-        ws.column_dimensions[get_column_letter(i)].width = min(max(best + 2, 10), 60)
-
-
-def highlight_rows(ws, df, col_name, match_val, bg, fg=None):
-    if col_name not in df.columns:
-        return
-    idx = list(df.columns).index(col_name) + 1
-    fill = PatternFill(start_color=bg, end_color=bg, fill_type='solid')
-    for r in range(2, len(df) + 2):
-        if str(ws.cell(row=r, column=idx).value) == match_val:
-            for c in ws[r]:
-                c.fill = fill
-            if fg:
-                ws.cell(row=r, column=idx).font = Font(color=fg, bold=True)
+def rows_to_df(rows_out):
+    data = []
+    for r in rows_out:
+        data.append({
+            'Interested Person Contacted': r['int_name'],
+            'Interested Person Title':     r['int_title'],
+            'Interested Person Location':  r['int_location'],
+            'Interested Person Email':     r['int_email'],
+            'Company':                     r['company'],
+            'New Contact Name':            r['new_name'],
+            'New Contact Title':           r['new_title'],
+            'New Contact Email':           r['new_email'],
+            'New Contact Location':        r['new_location'],
+            'Main Body Subject':           r['subject'],
+            'Main Body':                   r['body'],
+            'Follow-up Subject':           r['fu_subject'],
+            'Follow-up Body':              r['fu_body'],
+            'Notes / Flags':               r['notes'],
+        })
+    return pd.DataFrame(data, columns=OUTPUT_COLUMNS)
 
 
-def highlight_has_value_rows(ws, df, col_name, bg):
-    if col_name not in df.columns:
-        return
-    idx = list(df.columns).index(col_name) + 1
-    fill = PatternFill(start_color=bg, end_color=bg, fill_type='solid')
-    for r in range(2, len(df) + 2):
-        if ws.cell(row=r, column=idx).value:
-            for c in ws[r]:
-                c.fill = fill
-
-
-# ── Message Generator routes ──────────────────────────────────────────────────
+# ── Resolve input files ───────────────────────────────────────────────────────
 
 def resolve_inputs(request, int_key='interested', org_key='organization'):
-    """Return (int_df, org_df) from either uploaded files or reference filenames."""
     int_name = request.form.get('interested_ref')
     org_name = request.form.get('organization_ref')
+    int_f    = request.files.get(int_key)
+    org_f    = request.files.get(org_key)
 
-    int_f = request.files.get(int_key)
-    org_f = request.files.get(org_key)
-
-    # Save any newly uploaded files to reference
     if int_f and int_f.filename:
         save_to_reference(int_f, int_f.filename)
         int_f.seek(0)
@@ -304,55 +485,41 @@ def resolve_inputs(request, int_key='interested', org_key='organization'):
 
     if not int_src or not org_src:
         return None, None, 'Both an Interested List and an Organization List are required.'
-
     try:
         int_df = open_file(int_src)
         org_df = open_file(org_src)
     except Exception as e:
         return None, None, str(e)
-
     return int_df, org_df, None
 
+
+# ── Message Generator routes ──────────────────────────────────────────────────
 
 @app.route('/api/preview', methods=['POST'])
 def preview():
     int_df, org_df, err = resolve_inputs(request)
     if err:
         return jsonify({'ok': False, 'error': err}), 400
-
-    int_co_col = find_col(int_df, 'company', 'organization', 'org', 'employer', 'firm', 'account')
-    org_co_col = find_col(org_df, 'company', 'organization', 'org', 'employer', 'firm', 'account')
-
-    if not int_co_col:
-        return jsonify({'ok': False,
-                        'error': f'No company column in Interested list. Found: {list(int_df.columns)}'}), 400
-    if not org_co_col:
-        return jsonify({'ok': False,
-                        'error': f'No company column in Organization list. Found: {list(org_df.columns)}'}), 400
-
-    co_map = build_company_map(int_df, int_co_col)
-    rows_out = []
-
-    for _, row in org_df.iterrows():
-        co_raw = safe_str(row.get(org_co_col, ''))
-        full_name = extract_name(row, org_df)
-        first = full_name.split()[0] if full_name else 'there'
-        contacts, matched_co, match_type = lookup_company(co_raw, co_map)
-        contacts_str = format_contacts(contacts)
-        msg = build_msg(first, full_name, co_raw or matched_co, contacts_str) if contacts else ''
-        rows_out.append({
-            'name': full_name,
-            'company': co_raw,
-            'matched_company': matched_co,
-            'match_type': match_type,
-            'contacts': contacts_str,
-            'message': msg,
-            'has_match': bool(contacts),
-        })
+    try:
+        rows_out = build_output_rows(int_df, org_df)
+    except ValueError as e:
+        return jsonify({'ok': False, 'error': str(e)}), 400
 
     matched = sum(1 for r in rows_out if r['has_match'])
-    return jsonify({'ok': True, 'total': len(rows_out), 'matched': matched,
-                    'unmatched': len(rows_out) - matched, 'preview': rows_out[:100]})
+    preview_rows = [{
+        'int_name':   r['int_name'],
+        'company':    r['company'],
+        'new_name':   r['new_name'],
+        'new_title':  r['new_title'],
+        'subject':    r['subject'],
+        'body_short': r['body'][:120] + '…' if r['body'] else '',
+        'match_type': r['match_type'],
+        'has_match':  r['has_match'],
+    } for r in rows_out[:100]]
+
+    return jsonify({'ok': True, 'total': len(rows_out),
+                    'matched': matched, 'unmatched': len(rows_out) - matched,
+                    'preview': preview_rows})
 
 
 @app.route('/api/generate', methods=['POST'])
@@ -360,48 +527,83 @@ def generate():
     int_df, org_df, err = resolve_inputs(request)
     if err:
         return jsonify({'ok': False, 'error': err}), 400
+    try:
+        rows_out = build_output_rows(int_df, org_df)
+    except ValueError as e:
+        return jsonify({'ok': False, 'error': str(e)}), 400
 
-    int_co_col = find_col(int_df, 'company', 'organization', 'org', 'employer', 'firm', 'account')
-    org_co_col = find_col(org_df, 'company', 'organization', 'org', 'employer', 'firm', 'account')
-    co_map = build_company_map(int_df, int_co_col)
-
-    output_rows = []
-    for _, row in org_df.iterrows():
-        co_raw = safe_str(row.get(org_co_col, ''))
-        full_name = extract_name(row, org_df)
-        first = full_name.split()[0] if full_name else 'there'
-        contacts, matched_co, _ = lookup_company(co_raw, co_map)
-        contacts_str = format_contacts(contacts)
-        msg = build_msg(first, full_name, co_raw or matched_co, contacts_str) if contacts else ''
-        r = {col: safe_str(row[col]) for col in org_df.columns}
-        r['Previous Contacts'] = contacts_str
-        r['Message'] = msg
-        output_rows.append(r)
-
-    out_df = pd.DataFrame(output_rows)
-    base_cols = [c for c in out_df.columns if c not in ('Previous Contacts', 'Message')]
-    out_df = out_df[base_cols + ['Previous Contacts', 'Message']]
+    out_df = rows_to_df(rows_out)
+    matched = sum(1 for r in rows_out if r['has_match'])
 
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-        out_df.to_excel(writer, index=False, sheet_name='FEAAM Messages')
-        ws = writer.sheets['FEAAM Messages']
-        style_header(ws, len(out_df.columns))
-        auto_width(ws, out_df)
-        highlight_has_value_rows(ws, out_df, 'Message', 'e8f5e9')
-    buf.seek(0)
+        # Title row
+        out_df.to_excel(writer, index=False, startrow=2, sheet_name='FEAAM Outreach')
+        ws = writer.sheets['FEAAM Outreach']
 
-    return send_file(buf, download_name='feaam_messages.xlsx', as_attachment=True,
+        # Row 1: title + summary
+        title_text = (f"FEAAM Warm-Referral Outreach – Full Generation  |  "
+                      f"Total warm leads: {matched}  |  Generated for new contacts at companies "
+                      f"where an interested colleague exists.")
+        ws.cell(row=1, column=1, value=title_text)
+        ws.cell(row=1, column=1).font = Font(bold=True, size=11, color='E4E8F4')
+        ws.cell(row=1, column=1).fill = PatternFill(start_color='111520',
+                                                     end_color='111520', fill_type='solid')
+        ws.merge_cells(start_row=1, start_column=1,
+                       end_row=1,   end_column=len(OUTPUT_COLUMNS))
+
+        # Style header row (row 3)
+        header_fill = PatternFill(start_color='1e2436', end_color='1e2436', fill_type='solid')
+        header_font = Font(color='E4E8F4', bold=True, size=10)
+        for cell in ws[3]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+        ws.row_dimensions[3].height = 28
+
+        # Highlight matched rows (light green), unmatched (subtle)
+        green_fill = PatternFill(start_color='0d2818', end_color='0d2818', fill_type='solid')
+        grey_fill  = PatternFill(start_color='161620', end_color='161620', fill_type='solid')
+        for row_idx, r in enumerate(rows_out, start=4):
+            fill = green_fill if r['has_match'] else grey_fill
+            for col_idx in range(1, len(OUTPUT_COLUMNS) + 1):
+                ws.cell(row=row_idx, column=col_idx).fill = fill
+            # Wrap text for body columns
+            for col_name in ('Main Body', 'Follow-up Body'):
+                c_idx = OUTPUT_COLUMNS.index(col_name) + 1
+                ws.cell(row=row_idx, column=c_idx).alignment = Alignment(wrap_text=True, vertical='top')
+
+        # Column widths
+        widths = {
+            'Interested Person Contacted': 28,
+            'Interested Person Title': 36,
+            'Interested Person Location': 24,
+            'Interested Person Email': 28,
+            'Company': 22,
+            'New Contact Name': 24,
+            'New Contact Title': 36,
+            'New Contact Email': 28,
+            'New Contact Location': 20,
+            'Main Body Subject': 44,
+            'Main Body': 55,
+            'Follow-up Subject': 44,
+            'Follow-up Body': 55,
+            'Notes / Flags': 18,
+        }
+        for i, col in enumerate(OUTPUT_COLUMNS, 1):
+            ws.column_dimensions[get_column_letter(i)].width = widths.get(col, 20)
+
+        ws.freeze_panes = 'A4'
+
+    buf.seek(0)
+    return send_file(buf, download_name='FEAAM_Outreach_Messages.xlsx', as_attachment=True,
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 
 # ── Deduplication routes ──────────────────────────────────────────────────────
 
 def collect_other_keys(request):
-    """Collect email/name keys from all 'others' sources (uploaded or reference)."""
     other_emails, other_names = set(), set()
-
-    # Uploaded files
     for f in request.files.getlist('others'):
         if not f.filename:
             continue
@@ -412,15 +614,12 @@ def collect_other_keys(request):
             _extract_keys(df, other_emails, other_names)
         except Exception:
             pass
-
-    # Reference filenames
     for name in request.form.getlist('others_ref'):
         try:
             df = read_excel_from_path(os.path.join(REFERENCE_DIR, name))
             _extract_keys(df, other_emails, other_names)
         except Exception:
             pass
-
     return other_emails, other_names
 
 
@@ -435,71 +634,10 @@ def _extract_keys(df, emails, names):
             names.update(v for v in vals if v != 'nan')
 
 
-@app.route('/api/dedup-preview', methods=['POST'])
-def dedup_preview():
-    ref_name = request.form.get('reference_ref')
-    ref_f    = request.files.get('reference')
-
-    if ref_f and ref_f.filename:
-        save_to_reference(ref_f, ref_f.filename)
-        ref_f.seek(0)
-
-    ref_src = ref_name if ref_name else ref_f
-    if not ref_src:
-        return jsonify({'ok': False, 'error': 'Reference file required'}), 400
-
-    try:
-        ref_df = open_file(ref_src)
-    except Exception as e:
-        return jsonify({'ok': False, 'error': str(e)}), 400
-
+def _run_dedup(ref_df, other_emails, other_names):
     ref_email_col = find_col(ref_df, 'email', 'e-mail', 'mail')
     ref_name_col  = find_col(ref_df, 'full name', 'fullname', 'name')
-    other_emails, other_names = collect_other_keys(request)
-
-    dup_rows = []
-    for _, row in ref_df.iterrows():
-        is_dup, reason = False, ''
-        if ref_email_col:
-            email = safe_str(row.get(ref_email_col, '')).lower()
-            if email and email in other_emails:
-                is_dup, reason = True, 'Email match'
-        if not is_dup and ref_name_col:
-            name = safe_str(row.get(ref_name_col, '')).lower()
-            if name and name in other_names:
-                is_dup, reason = True, 'Name match'
-        if is_dup:
-            dup_rows.append({
-                'name':   safe_str(row.get(ref_name_col, '')) if ref_name_col else '',
-                'email':  safe_str(row.get(ref_email_col, '')) if ref_email_col else '',
-                'reason': reason,
-            })
-
-    return jsonify({'ok': True, 'total': len(ref_df),
-                    'duplicates': len(dup_rows), 'unique': len(ref_df) - len(dup_rows),
-                    'preview': dup_rows[:50]})
-
-
-@app.route('/api/dedup-download', methods=['POST'])
-def dedup_download():
-    ref_name = request.form.get('reference_ref')
-    ref_f    = request.files.get('reference')
-
-    if ref_f and ref_f.filename:
-        save_to_reference(ref_f, ref_f.filename)
-        ref_f.seek(0)
-
-    ref_src = ref_name if ref_name else ref_f
-    try:
-        ref_df = open_file(ref_src)
-    except Exception as e:
-        return jsonify({'ok': False, 'error': str(e)}), 400
-
-    ref_email_col = find_col(ref_df, 'email', 'e-mail', 'mail')
-    ref_name_col  = find_col(ref_df, 'full name', 'fullname', 'name')
-    other_emails, other_names = collect_other_keys(request)
-
-    statuses, reasons = [], []
+    dup_rows, statuses, reasons = [], [], []
     for _, row in ref_df.iterrows():
         is_dup, reason = False, ''
         if ref_email_col:
@@ -512,6 +650,49 @@ def dedup_download():
                 is_dup, reason = True, 'Name match'
         statuses.append('Duplicate' if is_dup else 'Unique')
         reasons.append(reason)
+        if is_dup:
+            dup_rows.append({
+                'name':   safe_str(row.get(ref_name_col, '')) if ref_name_col else '',
+                'email':  safe_str(row.get(ref_email_col, '')) if ref_email_col else '',
+                'reason': reason,
+            })
+    return statuses, reasons, dup_rows, ref_email_col, ref_name_col
+
+
+def resolve_ref(request):
+    ref_name = request.form.get('reference_ref')
+    ref_f    = request.files.get('reference')
+    if ref_f and ref_f.filename:
+        save_to_reference(ref_f, ref_f.filename)
+        ref_f.seek(0)
+    src = ref_name if ref_name else ref_f
+    if not src:
+        return None, 'Reference file required'
+    try:
+        return open_file(src), None
+    except Exception as e:
+        return None, str(e)
+
+
+@app.route('/api/dedup-preview', methods=['POST'])
+def dedup_preview():
+    ref_df, err = resolve_ref(request)
+    if err:
+        return jsonify({'ok': False, 'error': err}), 400
+    other_emails, other_names = collect_other_keys(request)
+    statuses, _, dup_rows, _, _ = _run_dedup(ref_df, other_emails, other_names)
+    return jsonify({'ok': True, 'total': len(ref_df),
+                    'duplicates': len(dup_rows), 'unique': len(ref_df) - len(dup_rows),
+                    'preview': dup_rows[:50]})
+
+
+@app.route('/api/dedup-download', methods=['POST'])
+def dedup_download():
+    ref_df, err = resolve_ref(request)
+    if err:
+        return jsonify({'ok': False, 'error': err}), 400
+    other_emails, other_names = collect_other_keys(request)
+    statuses, reasons, _, _, _ = _run_dedup(ref_df, other_emails, other_names)
 
     out_df = ref_df.copy()
     out_df['Status'] = statuses
@@ -521,9 +702,19 @@ def dedup_download():
     with pd.ExcelWriter(buf, engine='openpyxl') as writer:
         out_df.to_excel(writer, index=False, sheet_name='Deduplication')
         ws = writer.sheets['Deduplication']
-        style_header(ws, len(out_df.columns))
-        auto_width(ws, out_df)
-        highlight_rows(ws, out_df, 'Status', 'Duplicate', 'ffebee', 'c62828')
+        hf = PatternFill(start_color='111520', end_color='111520', fill_type='solid')
+        for cell in ws[1]:
+            cell.fill = hf
+            cell.font = Font(color='E4E8F4', bold=True)
+        red_fill = PatternFill(start_color='ffebee', end_color='ffebee', fill_type='solid')
+        s_idx = list(out_df.columns).index('Status') + 1
+        for r in range(2, len(out_df) + 2):
+            if ws.cell(row=r, column=s_idx).value == 'Duplicate':
+                for c in ws[r]:
+                    c.fill = red_fill
+                ws.cell(row=r, column=s_idx).font = Font(color='c62828', bold=True)
+        for i in range(1, len(out_df.columns) + 1):
+            ws.column_dimensions[get_column_letter(i)].width = 22
     buf.seek(0)
 
     return send_file(buf, download_name='feaam_deduplication.xlsx', as_attachment=True,
