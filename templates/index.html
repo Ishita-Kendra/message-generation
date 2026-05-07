@@ -68,7 +68,7 @@
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
         </svg>
-        <div>No reference files yet — drop files here or click <strong>Add Files</strong></div>
+        <div>No reference files yet — drop Excel or CSV files here or click <strong>Add Files</strong></div>
       </div>
     </div>
   </div>
@@ -133,9 +133,9 @@
             <polyline points="14 2 14 8 20 8"/>
             <line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/>
           </svg>
-          <div class="drop-text">Drop Excel or</div>
+          <div class="drop-text">Drop Excel/CSV or</div>
           <label class="btn-upload">Browse
-            <input type="file" accept=".xlsx,.xls" id="intFile" hidden onchange="onFileSelect('intFile','intMeta','intDrop','intRefSelect')"/>
+            <input type="file" accept=".xlsx,.xls,.csv" id="intFile" hidden onchange="onFileSelect('intFile','intMeta','intDrop','intRefSelect')"/>
           </label>
           <div class="file-meta" id="intMeta"></div>
         </div>
@@ -164,9 +164,9 @@
             <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
             <line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/>
           </svg>
-          <div class="drop-text">Drop Excel or</div>
+          <div class="drop-text">Drop Excel/CSV or</div>
           <label class="btn-upload">Browse
-            <input type="file" accept=".xlsx,.xls" id="orgFile" hidden onchange="onFileSelect('orgFile','orgMeta','orgDrop','orgRefSelect')"/>
+            <input type="file" accept=".xlsx,.xls,.csv" id="orgFile" hidden onchange="onFileSelect('orgFile','orgMeta','orgDrop','orgRefSelect')"/>
           </label>
           <div class="file-meta" id="orgMeta"></div>
         </div>
@@ -250,9 +250,9 @@
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
             <polyline points="14 2 14 8 20 8"/>
           </svg>
-          <div class="drop-text">Drop Excel or</div>
+          <div class="drop-text">Drop Excel/CSV or</div>
           <label class="btn-upload">Browse
-            <input type="file" accept=".xlsx,.xls" id="dedupRefFile" hidden onchange="onFileSelect('dedupRefFile','dedupRefMeta','dedupRefDrop','dedupRefSelect')"/>
+            <input type="file" accept=".xlsx,.xls,.csv" id="dedupRefFile" hidden onchange="onFileSelect('dedupRefFile','dedupRefMeta','dedupRefDrop','dedupRefSelect')"/>
           </label>
           <div class="file-meta" id="dedupRefMeta"></div>
         </div>
@@ -279,9 +279,9 @@
             <path d="M16 16l-4-4-4 4"/><path d="M12 12v9"/>
             <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
           </svg>
-          <div class="drop-text">Drop one or more files or</div>
+          <div class="drop-text">Drop Excel/CSV files or</div>
           <label class="btn-upload">Browse
-            <input type="file" accept=".xlsx,.xls" id="othersFiles" hidden multiple onchange="onMultiFileSelect('othersFiles','othersMeta','othersDrop')"/>
+            <input type="file" accept=".xlsx,.xls,.csv" id="othersFiles" hidden multiple onchange="onMultiFileSelect('othersFiles','othersMeta','othersDrop')"/>
           </label>
           <div class="file-meta" id="othersMeta"></div>
           <div id="othersFileList" class="file-list"></div>

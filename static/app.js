@@ -28,6 +28,7 @@ function fileIcon(name) {
   const ext = (name || '').split('.').pop().toLowerCase();
   if (ext === 'pdf') return 'PDF';
   if (ext === 'docx' || ext === 'doc') return 'DOC';
+  if (ext === 'csv') return 'CSV';
   return 'XLS';
 }
 
@@ -239,7 +240,7 @@ function onDropMulti(e, inputId, zoneId, metaId) {
   e.preventDefault();
   onDragLeave(zoneId);
   Array.from(e.dataTransfer.files)
-    .filter(f => f.name.match(/\.xlsx?$/i))
+    .filter(f => f.name.match(/\.(xlsx?|csv)$/i))
     .forEach(f => addOtherFile(f));
   renderOtherFiles();
   if (otherFiles.length) document.getElementById(zoneId).classList.add('has-file');

@@ -287,6 +287,13 @@ def safe_str(v):
 
 
 def read_excel(f):
+    name = getattr(f, 'filename', '') or getattr(f, 'name', '')
+    if str(name).lower().endswith('.csv'):
+        try:
+            return pd.read_csv(f)
+        except Exception:
+            f.seek(0)
+            return pd.read_csv(f, encoding='latin-1')
     try:
         return pd.read_excel(f, engine='openpyxl')
     except Exception:
@@ -295,6 +302,11 @@ def read_excel(f):
 
 
 def read_excel_from_path(path):
+    if path.lower().endswith('.csv'):
+        try:
+            return pd.read_csv(path)
+        except Exception:
+            return pd.read_csv(path, encoding='latin-1')
     try:
         return pd.read_excel(path, engine='openpyxl')
     except Exception:
