@@ -10,6 +10,9 @@ let orgRefName      = '';
 let dedupRefName    = '';
 let othersRefNames  = new Set();
 
+// Active tab in Reference Files section
+let activeRefTab = 'reference';
+
 /* ── Reference Files — load & render ─────────────────────────────────────── */
 async function loadReferenceFiles() {
   try {
@@ -21,27 +24,38 @@ async function loadReferenceFiles() {
   }
 }
 
+function fileIcon(name) {
+  const ext = (name || '').split('.').pop().toLowerCase();
+  if (ext === 'pdf') return 'PDF';
+  if (ext === 'docx' || ext === 'doc') return 'DOC';
+  return 'XLS';
+}
+
 function renderReferenceFiles(files) {
-  const grid  = document.getElementById('refFileGrid');
-  const empty = document.getElementById('refEmpty');
+  const refFiles = files.filter(f => !f.type || f.type === 'reference');
+  const outFiles = files.filter(f => f.type === 'output');
+
+  renderFileGrid(refFiles, 'refFileGrid', 'refEmpty');
+  renderFileGrid(outFiles, 'outRefFileGrid', 'outRefEmpty');
+  syncRefSelects(refFiles);
+}
+
+function renderFileGrid(files, gridId, emptyId) {
+  const grid  = document.getElementById(gridId);
+  const empty = document.getElementById(emptyId);
+  [...grid.querySelectorAll('.ref-file-card')].forEach(c => c.remove());
 
   if (!files.length) {
     empty.style.display = '';
-    // Clear any existing cards
-    [...grid.querySelectorAll('.ref-file-card')].forEach(c => c.remove());
-    syncRefSelects([]);
     return;
   }
-
   empty.style.display = 'none';
-  [...grid.querySelectorAll('.ref-file-card')].forEach(c => c.remove());
-
   files.forEach(f => {
     const card = document.createElement('div');
     card.className = 'ref-file-card';
     card.id = `rfc-${f.name}`;
     card.innerHTML = `
-      <div class="ref-file-icon">XLS</div>
+      <div class="ref-file-icon">${fileIcon(f.name)}</div>
       <div class="ref-file-info">
         <div class="ref-file-name" title="${esc(f.original_name || f.name)}">${esc(f.original_name || f.name)}</div>
         <div class="ref-file-meta">${fmtSize(f.size)} · ${fmtDate(f.uploaded_at)}</div>
@@ -55,8 +69,15 @@ function renderReferenceFiles(files) {
     `;
     grid.appendChild(card);
   });
+}
 
-  syncRefSelects(files);
+/* ── Tab switching ────────────────────────────────────────────────────────── */
+function switchRefTab(tab) {
+  activeRefTab = tab;
+  document.getElementById('tabRefFiles').classList.toggle('active', tab === 'reference');
+  document.getElementById('tabOutRef').classList.toggle('active', tab === 'output');
+  document.getElementById('refGlobalDrop').classList.toggle('hidden', tab !== 'reference');
+  document.getElementById('outRefGlobalDrop').classList.toggle('hidden', tab !== 'output');
 }
 
 function syncRefSelects(files) {
@@ -115,6 +136,7 @@ async function uploadRefFiles(input) {
   if (!input.files.length) return;
   const fd = new FormData();
   Array.from(input.files).forEach(f => fd.append('files', f));
+  fd.append('type', activeRefTab);
   try {
     await fetch('/api/reference-files', { method: 'POST', body: fd });
     await loadReferenceFiles();
@@ -135,13 +157,36 @@ function onRefDragLeave() {
 async function onRefDrop(e) {
   e.preventDefault();
   onRefDragLeave();
-  const files = Array.from(e.dataTransfer.files).filter(f => f.name.match(/\.xlsx?$/i));
-  if (!files.length) return;
+  if (!e.dataTransfer.files.length) return;
   const fd = new FormData();
-  files.forEach(f => fd.append('files', f));
+  Array.from(e.dataTransfer.files).forEach(f => fd.append('files', f));
+  fd.append('type', 'reference');
   try {
     await fetch('/api/reference-files', { method: 'POST', body: fd });
     await loadReferenceFiles();
+  } catch (err) {
+    alert('Upload failed: ' + err.message);
+  }
+}
+
+function onOutRefDragOver(e) {
+  e.preventDefault();
+  document.getElementById('outRefGlobalDrop').classList.add('drag-over');
+}
+function onOutRefDragLeave() {
+  document.getElementById('outRefGlobalDrop').classList.remove('drag-over');
+}
+async function onOutRefDrop(e) {
+  e.preventDefault();
+  onOutRefDragLeave();
+  if (!e.dataTransfer.files.length) return;
+  const fd = new FormData();
+  Array.from(e.dataTransfer.files).forEach(f => fd.append('files', f));
+  fd.append('type', 'output');
+  try {
+    await fetch('/api/reference-files', { method: 'POST', body: fd });
+    await loadReferenceFiles();
+    switchRefTab('output');
   } catch (err) {
     alert('Upload failed: ' + err.message);
   }

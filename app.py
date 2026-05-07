@@ -168,7 +168,7 @@ def save_manifest(manifest):
         json.dump(manifest, f, indent=2)
 
 
-def save_to_reference(file_obj, original_name):
+def save_to_reference(file_obj, original_name, file_type='reference'):
     manifest = load_manifest()
     safe_name = re.sub(r'[^\w.\-]', '_', original_name)
     dest_path = os.path.join(REFERENCE_DIR, safe_name)
@@ -177,11 +177,14 @@ def save_to_reference(file_obj, original_name):
     file_obj.seek(0)
     with open(dest_path, 'wb') as f:
         f.write(content)
+    # Preserve existing type if file already in manifest
+    existing = next((e for e in manifest if e['name'] == safe_name), None)
     entry = {
         'name': safe_name,
         'original_name': original_name,
         'size': len(content),
         'uploaded_at': datetime.now().isoformat(timespec='seconds'),
+        'type': existing['type'] if existing and 'type' in existing else file_type,
     }
     manifest = [e for e in manifest if e['name'] != safe_name]
     manifest.append(entry)
@@ -203,7 +206,10 @@ def upload_reference_file():
     files = request.files.getlist('files')
     if not files:
         return jsonify({'ok': False, 'error': 'No files provided'}), 400
-    saved = [save_to_reference(f, f.filename) for f in files if f.filename]
+    file_type = request.form.get('type', 'reference')
+    if file_type not in ('reference', 'output'):
+        file_type = 'reference'
+    saved = [save_to_reference(f, f.filename, file_type) for f in files if f.filename]
     return jsonify({'ok': True, 'saved': saved})
 
 

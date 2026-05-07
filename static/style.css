@@ -123,6 +123,31 @@ h1{font-size:17px;font-weight:700;letter-spacing:-.3px}
 }
 .ref-file-delete:hover{color:var(--red);background:rgba(239,68,68,.12)}
 
+/* ── Reference file tabs ─────────────────────────────────────────────────── */
+.ref-tab-bar{
+  display:flex;gap:4px;margin-bottom:10px;
+  border-bottom:1px solid var(--border);padding-bottom:0;
+}
+.ref-tab{
+  display:flex;align-items:center;gap:6px;
+  padding:7px 14px;border:none;border-radius:7px 7px 0 0;
+  background:transparent;color:var(--muted2);
+  font-size:12px;font-weight:600;cursor:pointer;
+  border:1px solid transparent;border-bottom:none;
+  margin-bottom:-1px;transition:color .15s,background .15s;
+}
+.ref-tab:hover{color:var(--text);background:var(--bg3)}
+.ref-tab.active{
+  color:var(--ref);background:var(--bg3);
+  border-color:var(--border);border-bottom-color:var(--bg3);
+}
+#tabOutRef.active{color:var(--green)}
+
+.out-ref-hint{
+  width:100%;text-align:center;font-size:10px;
+  color:var(--muted);padding-top:6px;
+}
+
 /* ── Upload grid ─────────────────────────────────────────────────────────── */
 .upload-grid{
   display:grid;grid-template-columns:1fr 1fr;

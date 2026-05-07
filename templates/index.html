@@ -31,16 +31,34 @@
       Reference Files
     </div>
     <div class="section-hint">All uploaded files are stored here permanently — use them in any section below</div>
-    <label class="btn-add-ref">
+    <label class="btn-add-ref" id="btnAddRef">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
         <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
       </svg>
       Add Files
-      <input type="file" accept=".xlsx,.xls" id="refAddInput" hidden multiple onchange="uploadRefFiles(this)"/>
+      <input type="file" accept=".xlsx,.xls,.docx,.doc,.pdf" id="refAddInput" hidden multiple onchange="uploadRefFiles(this)"/>
     </label>
   </div>
 
-  <!-- Drop zone for reference files -->
+  <!-- Tab bar -->
+  <div class="ref-tab-bar">
+    <button class="ref-tab active" id="tabRefFiles" onclick="switchRefTab('reference')">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+      </svg>
+      Reference Files
+    </button>
+    <button class="ref-tab" id="tabOutRef" onclick="switchRefTab('output')">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <polyline points="8 13 10 15 14 11"/>
+      </svg>
+      Output Reference
+    </button>
+  </div>
+
+  <!-- Drop zone — reference files tab -->
   <div class="ref-dropzone" id="refGlobalDrop"
        ondragover="onRefDragOver(event)"
        ondragleave="onRefDragLeave()"
@@ -50,9 +68,27 @@
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
         </svg>
-        <div>No files yet — drop Excel files here or click <strong>Add Files</strong></div>
+        <div>No reference files yet — drop files here or click <strong>Add Files</strong></div>
       </div>
     </div>
+  </div>
+
+  <!-- Drop zone — output reference tab -->
+  <div class="ref-dropzone hidden" id="outRefGlobalDrop"
+       ondragover="onOutRefDragOver(event)"
+       ondragleave="onOutRefDragLeave()"
+       ondrop="onOutRefDrop(event)">
+    <div id="outRefFileGrid" class="ref-file-grid">
+      <div class="ref-empty" id="outRefEmpty">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <polyline points="8 13 10 15 14 11"/>
+        </svg>
+        <div>No output reference files yet — drop an Excel here or click <strong>Add Files</strong></div>
+      </div>
+    </div>
+    <div class="out-ref-hint">Files here define the expected output format and are not used as inputs</div>
   </div>
 
 </div>

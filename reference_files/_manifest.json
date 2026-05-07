@@ -3,18 +3,21 @@
     "name": "FEAAM_Outreach_FullSet.xlsx",
     "original_name": "FEAAM_Outreach_FullSet.xlsx",
     "size": 55669,
-    "uploaded_at": "2026-05-07T17:43:02"
+    "uploaded_at": "2026-05-07T17:43:02",
+    "type": "output"
   },
   {
     "name": "Christians_annotations.docx",
     "original_name": "Christian's annotions.docx",
     "size": 17593,
-    "uploaded_at": "2026-05-07T17:49:20"
+    "uploaded_at": "2026-05-07T17:49:20",
+    "type": "reference"
   },
   {
     "name": "Ebus_Feedback_Per_Mail.docx",
     "original_name": "Ebru's Feedback (Per mail).docx",
     "size": 35971,
-    "uploaded_at": "2026-05-07T18:21:43"
+    "uploaded_at": "2026-05-07T18:21:43",
+    "type": "reference"
   }
 ]
