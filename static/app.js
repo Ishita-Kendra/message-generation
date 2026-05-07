@@ -46,7 +46,12 @@ function renderReferenceFiles(files) {
         <div class="ref-file-name" title="${esc(f.original_name || f.name)}">${esc(f.original_name || f.name)}</div>
         <div class="ref-file-meta">${fmtSize(f.size)} · ${fmtDate(f.uploaded_at)}</div>
       </div>
-      <div class="ref-file-delete" title="Remove" onclick="deleteRefFile('${f.name}')">✕</div>
+      <div class="ref-file-delete" title="Delete file" onclick="deleteRefFile('${f.name}')">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+          <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+        </svg>
+      </div>
     `;
     grid.appendChild(card);
   });
