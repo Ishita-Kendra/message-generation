@@ -774,29 +774,37 @@ def rows_to_df(rows_out, out_cols=None):
     if out_cols is None:
         out_cols = list(OUTPUT_COLUMNS)
 
-    # Map our internal field names to the reference column names (flexible)
-    # We match by keyword so it works even if the reference renames columns slightly.
-    def pick_col(cols, *keywords):
-        for kw in keywords:
-            for c in cols:
-                if kw.lower() in str(c).lower():
-                    return c
+    def _match(must_have, must_not=None):
+        """Return first column that contains all `must_have` words and none of `must_not`."""
+        must_not = must_not or []
+        for c in out_cols:
+            cl = str(c).lower()
+            if all(w in cl for w in must_have) and not any(w in cl for w in must_not):
+                return c
         return None
 
-    col_int_name  = pick_col(out_cols, 'interested person contacted', 'interested person', 'interested')
-    col_int_title = pick_col(out_cols, 'interested person title')
-    col_int_loc   = pick_col(out_cols, 'interested person location')
-    col_int_email = pick_col(out_cols, 'interested person email')
-    col_company   = pick_col(out_cols, 'company')
-    col_new_name  = pick_col(out_cols, 'new contact name', 'new contact')
-    col_new_title = pick_col(out_cols, 'new contact title')
-    col_new_email = pick_col(out_cols, 'new contact email')
-    col_new_loc   = pick_col(out_cols, 'new contact location')
-    col_subj      = pick_col(out_cols, 'main body subject')
-    col_body      = pick_col(out_cols, 'main body')
-    col_fu_subj   = pick_col(out_cols, 'follow-up subject', 'followup subject', 'follow up subject')
-    col_fu_body   = pick_col(out_cols, 'follow-up body', 'followup body', 'follow up body')
-    col_notes     = pick_col(out_cols, 'notes', 'flags')
+    col_int_name  = _match(['interested', 'person', 'contacted']) \
+                    or _match(['interested', 'person']) or _match(['interested'])
+    col_int_title = _match(['interested', 'title'])
+    col_int_loc   = _match(['interested', 'location'])
+    col_int_email = _match(['interested', 'email'])
+    col_company   = _match(['company'])
+    col_new_name  = _match(['new', 'contact', 'name'])
+    col_new_title = _match(['new', 'contact', 'title'])
+    col_new_email = _match(['new', 'contact', 'email'])
+    col_new_loc   = _match(['new', 'contact', 'location'])
+    # Main body — must have 'main' AND 'body', must NOT have 'subject'
+    col_subj      = _match(['main', 'body', 'subject'])
+    col_body      = _match(['main', 'body'], must_not=['subject'])
+    # Follow-up — must have 'follow', split by presence of 'subject'
+    col_fu_subj   = _match(['follow'], must_not=[]) and \
+                    next((c for c in out_cols if 'follow' in str(c).lower()
+                          and 'subject' in str(c).lower()), None)
+    col_fu_subj   = next((c for c in out_cols
+                          if 'follow' in str(c).lower() and 'subject' in str(c).lower()), None)
+    col_fu_body   = next((c for c in out_cols
+                          if 'follow' in str(c).lower() and 'subject' not in str(c).lower()), None)
+    col_notes     = _match(['notes']) or _match(['flags'])
 
     data = []
     for r in rows_out:
