@@ -159,28 +159,46 @@ def generate_followup(new_first, company, int_first, new_title, contact_index):
 
 # ── Output reference loader ───────────────────────────────────────────────────
 
+def _hex(color_obj):
+    """Extract a 6-char hex string from an openpyxl Color, or return None."""
+    if color_obj is None:
+        return None
+    try:
+        v = color_obj.rgb  # e.g. 'FF1E2436'
+        if v and v != '00000000' and len(v) >= 6:
+            return v[-6:]   # strip alpha
+    except Exception:
+        pass
+    return None
+
+
 def load_output_reference():
     """
-    Find the output-type reference file, read its column headers and all
-    existing messages indexed by (company_key, contact_name_lower).
-    Returns (columns_list, messages_dict).
+    Find the output-type reference file and return:
+      cols      – list of column header strings
+      messages  – dict {(company_key, contact_lower): {subject,body,fu_subject,fu_body}}
+      style     – dict describing the visual style to replicate in the output Excel
     """
+    from openpyxl import load_workbook
+
     manifest = load_manifest()
     for entry in sorted(manifest, key=lambda e: e.get('uploaded_at', ''), reverse=True):
         if entry.get('type') != 'output':
             continue
         path = os.path.join(REFERENCE_DIR, entry['name'])
-        if not os.path.exists(path):
+        if not os.path.exists(path) or not path.lower().endswith(('.xlsx', '.xls')):
             continue
         try:
-            # Detect header row (try rows 2, 1, 0)
-            ref_df = None
+            # ── 1. detect header row & read data ──────────────────────────────
+            ref_df   = None
+            hdr_row  = 2          # 0-indexed pandas row → physical row 3
             for hdr in [2, 1, 0]:
                 try:
-                    df = pd.read_excel(path, header=hdr, engine='openpyxl')
+                    df    = pd.read_excel(path, header=hdr, engine='openpyxl')
                     named = [c for c in df.columns if not str(c).startswith('Unnamed')]
                     if len(named) >= 5:
-                        ref_df = df[named]
+                        ref_df  = df[named]
+                        hdr_row = hdr
                         break
                 except Exception:
                     continue
@@ -189,7 +207,7 @@ def load_output_reference():
 
             cols = list(ref_df.columns)
 
-            # Locate key columns (case-insensitive)
+            # ── 2. read existing messages ─────────────────────────────────────
             def _fc(df, *kws):
                 for c in df.columns:
                     cl = str(c).lower()
@@ -222,12 +240,79 @@ def load_output_reference():
                         'fu_body':    safe_str(row.get(fu_body_col, '')) if fu_body_col else '',
                     }
 
-            return cols, messages
+            # ── 3. extract visual style from the workbook ─────────────────────
+            wb  = load_workbook(path, data_only=True)
+            ws  = wb.active
+            num_cols    = len(cols)
+            phys_hdr    = hdr_row + 1   # 1-indexed physical row of the header
+            phys_title  = phys_hdr - 1  # row above header (title row), may be 0
+
+            style = {
+                'header_row':  phys_hdr,      # 1-indexed row that has column headers
+                'data_start':  phys_hdr + 1,  # first data row
+                'freeze_col':  1,
+                'col_widths':  {},
+                'title_fill':  None,
+                'title_font_color': None,
+                'title_bold':  True,
+                'title_size':  11,
+                'title_text':  None,
+                'hdr_fill':    None,
+                'hdr_font_color': None,
+                'hdr_bold':    True,
+                'hdr_size':    10,
+                'hdr_height':  None,
+                'data_fill_match': None,   # fill for matched/present rows
+                'data_fill_other': None,   # fill for unmatched rows
+                'freeze_panes': None,
+            }
+
+            # Title row
+            if phys_title >= 1:
+                tc = ws.cell(row=phys_title, column=1)
+                style['title_fill']       = _hex(tc.fill.fgColor) if tc.fill else None
+                style['title_font_color'] = _hex(tc.font.color)   if tc.font else None
+                style['title_bold']       = tc.font.bold           if tc.font else True
+                style['title_size']       = tc.font.size           if tc.font else 11
+                style['title_text']       = tc.value
+
+            # Header row
+            hc = ws.cell(row=phys_hdr, column=1)
+            style['hdr_fill']       = _hex(hc.fill.fgColor) if hc.fill else None
+            style['hdr_font_color'] = _hex(hc.font.color)   if hc.font else None
+            style['hdr_bold']       = hc.font.bold           if hc.font else True
+            style['hdr_size']       = hc.font.size           if hc.font else 10
+            style['hdr_height']     = ws.row_dimensions[phys_hdr].height
+
+            # Data row fills (sample rows phys_hdr+1 and phys_hdr+2)
+            fills_found = []
+            for dr in range(phys_hdr + 1, min(phys_hdr + 6, ws.max_row + 1)):
+                dc = ws.cell(row=dr, column=1)
+                h  = _hex(dc.fill.fgColor) if dc.fill else None
+                if h and h not in fills_found:
+                    fills_found.append(h)
+            if fills_found:
+                style['data_fill_match'] = fills_found[0]
+                style['data_fill_other'] = fills_found[1] if len(fills_found) > 1 else fills_found[0]
+
+            # Column widths
+            for i, col_name in enumerate(cols, 1):
+                letter = get_column_letter(i)
+                w = ws.column_dimensions[letter].width
+                if w:
+                    style['col_widths'][col_name] = w
+
+            # Freeze panes
+            if ws.freeze_panes:
+                style['freeze_panes'] = ws.freeze_panes
+
+            wb.close()
+            return cols, messages, style
 
         except Exception as e:
             print(f'[output-ref] Could not load {entry["name"]}: {e}')
 
-    return list(OUTPUT_COLUMNS), {}
+    return list(OUTPUT_COLUMNS), {}, {}
 
 
 # ── Manifest helpers ──────────────────────────────────────────────────────────
@@ -636,7 +721,7 @@ def preview():
     int_df, org_df, err = resolve_inputs(request)
     if err:
         return jsonify({'ok': False, 'error': err}), 400
-    out_cols, ref_messages = load_output_reference()
+    out_cols, ref_messages, _ = load_output_reference()
     try:
         rows_out = build_output_rows(int_df, org_df, ref_messages)
     except ValueError as e:
@@ -669,7 +754,7 @@ def generate():
     int_df, org_df, err = resolve_inputs(request)
     if err:
         return jsonify({'ok': False, 'error': err}), 400
-    out_cols, ref_messages = load_output_reference()
+    out_cols, ref_messages, style = load_output_reference()
     try:
         rows_out = build_output_rows(int_df, org_df, ref_messages)
     except ValueError as e:
@@ -678,54 +763,77 @@ def generate():
     out_df  = rows_to_df(rows_out, out_cols)
     matched = sum(1 for r in rows_out if r['has_match'])
 
+    # ── Resolve style values (reference-extracted or sensible defaults) ───────
+    def _fill(hex_str, default):
+        h = hex_str or default
+        return PatternFill(start_color=h, end_color=h, fill_type='solid') if h else PatternFill()
+
+    def _font(color_hex, bold, size, default_color):
+        return Font(color=(color_hex or default_color), bold=bool(bold),
+                    size=float(size) if size else 10)
+
+    phys_hdr   = style.get('header_row', 3)
+    startrow   = phys_hdr - 1          # pandas startrow (0-indexed = phys_hdr-1)
+    has_title  = phys_hdr > 1          # is there a title row above the headers?
+    phys_title = phys_hdr - 1          # physical row of the title (if any)
+
+    title_fill_obj  = _fill(style.get('title_fill'),  '111520')
+    title_font_obj  = _font(style.get('title_font_color'), style.get('title_bold', True),
+                            style.get('title_size', 11), 'E4E8F4')
+    hdr_fill_obj    = _fill(style.get('hdr_fill'),    '1e2436')
+    hdr_font_obj    = _font(style.get('hdr_font_color'), style.get('hdr_bold', True),
+                            style.get('hdr_size', 10),  'E4E8F4')
+    match_fill_obj  = _fill(style.get('data_fill_match'), '0d2818')
+    other_fill_obj  = _fill(style.get('data_fill_other'), '161620')
+    ref_fill_obj    = PatternFill(start_color='0d1a2e', end_color='0d1a2e', fill_type='solid')
+
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-        # Title row
-        out_df.to_excel(writer, index=False, startrow=2, sheet_name='FEAAM Outreach')
+        out_df.to_excel(writer, index=False, startrow=startrow, sheet_name='FEAAM Outreach')
         ws = writer.sheets['FEAAM Outreach']
 
-        # Row 1: title + summary
-        title_text = (f"FEAAM Warm-Referral Outreach – Full Generation  |  "
-                      f"Total warm leads: {matched}  |  Generated for new contacts at companies "
-                      f"where an interested colleague exists.")
-        ws.cell(row=1, column=1, value=title_text)
-        ws.cell(row=1, column=1).font = Font(bold=True, size=11, color='E4E8F4')
-        ws.cell(row=1, column=1).fill = PatternFill(start_color='111520',
-                                                     end_color='111520', fill_type='solid')
-        ws.merge_cells(start_row=1, start_column=1,
-                       end_row=1,   end_column=len(out_cols))
+        # ── Title row ─────────────────────────────────────────────────────────
+        if has_title:
+            title_text = (
+                style.get('title_text') or
+                f"FEAAM Warm-Referral Outreach  |  Warm leads: {matched}  |  "
+                f"Style follows output reference."
+            )
+            # Replace any existing lead count in the stored title text
+            import re as _re
+            title_text = _re.sub(r'Total warm leads:\s*\d+',
+                                 f'Total warm leads: {matched}', str(title_text))
+            ws.cell(row=phys_title, column=1, value=title_text)
+            ws.cell(row=phys_title, column=1).font = title_font_obj
+            ws.cell(row=phys_title, column=1).fill = title_fill_obj
+            ws.merge_cells(start_row=phys_title, start_column=1,
+                           end_row=phys_title,   end_column=len(out_cols))
 
-        # Style header row (row 3)
-        header_fill = PatternFill(start_color='1e2436', end_color='1e2436', fill_type='solid')
-        header_font = Font(color='E4E8F4', bold=True, size=10)
-        for cell in ws[3]:
-            cell.fill = header_fill
-            cell.font = header_font
+        # ── Header row ────────────────────────────────────────────────────────
+        for cell in ws[phys_hdr]:
+            cell.fill      = hdr_fill_obj
+            cell.font      = hdr_font_obj
             cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
-        ws.row_dimensions[3].height = 28
+        if style.get('hdr_height'):
+            ws.row_dimensions[phys_hdr].height = style['hdr_height']
 
-        # Highlight matched rows (light green), ref-reused rows (blue tint), unmatched (subtle)
-        green_fill = PatternFill(start_color='0d2818', end_color='0d2818', fill_type='solid')
-        blue_fill  = PatternFill(start_color='0d1a2e', end_color='0d1a2e', fill_type='solid')
-        grey_fill  = PatternFill(start_color='161620', end_color='161620', fill_type='solid')
-        for row_idx, r in enumerate(rows_out, start=4):
-            if r.get('from_ref'):
-                fill = blue_fill
-            elif r['has_match']:
-                fill = green_fill
-            else:
-                fill = grey_fill
+        # ── Data rows ─────────────────────────────────────────────────────────
+        data_start = phys_hdr + 1
+        for row_idx, r in enumerate(rows_out, start=data_start):
+            fill = ref_fill_obj if r.get('from_ref') else \
+                   match_fill_obj if r['has_match'] else other_fill_obj
             for col_idx in range(1, len(out_cols) + 1):
                 ws.cell(row=row_idx, column=col_idx).fill = fill
-            # Wrap text for body columns
+            # Wrap body columns
             for col_name in out_cols:
                 cl = col_name.lower()
                 if 'body' in cl and 'subject' not in cl:
                     c_idx = out_cols.index(col_name) + 1
-                    ws.cell(row=row_idx, column=c_idx).alignment = Alignment(wrap_text=True, vertical='top')
+                    ws.cell(row=row_idx, column=c_idx).alignment = \
+                        Alignment(wrap_text=True, vertical='top')
 
-        # Column widths (defaults + overrides for known wide columns)
-        default_widths = {
+        # ── Column widths (from reference, else sensible defaults) ────────────
+        fallback_widths = {
             'Interested Person Contacted': 28, 'Interested Person Title': 36,
             'Interested Person Location': 24,  'Interested Person Email': 28,
             'Company': 22, 'New Contact Name': 24, 'New Contact Title': 36,
@@ -733,10 +841,13 @@ def generate():
             'Main Body Subject': 44, 'Main Body': 55,
             'Follow-up Subject': 44, 'Follow-up Body': 55, 'Notes / Flags': 18,
         }
+        ref_widths = style.get('col_widths', {})
         for i, col in enumerate(out_cols, 1):
-            ws.column_dimensions[get_column_letter(i)].width = default_widths.get(col, 20)
+            w = ref_widths.get(col) or fallback_widths.get(col, 20)
+            ws.column_dimensions[get_column_letter(i)].width = w
 
-        ws.freeze_panes = 'A4'
+        # ── Freeze panes (from reference, else default A{data_start}) ─────────
+        ws.freeze_panes = style.get('freeze_panes') or f'A{data_start}'
 
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx')
     buf.seek(0)
