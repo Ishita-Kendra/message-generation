@@ -349,22 +349,25 @@ async function runPreview() {
 }
 
 function renderMsgPreview(data) {
+  const fromRef = data.from_ref || 0;
   document.getElementById('msgStats').innerHTML = `
     <div class="stat-chip info"><span class="sc-label">Total Rows</span><span class="sc-val">${data.total}</span></div>
     <div class="stat-chip good"><span class="sc-label">Matched</span><span class="sc-val">${data.matched}</span></div>
     <div class="stat-chip warn"><span class="sc-label">No Match</span><span class="sc-val">${data.unmatched}</span></div>
     <div class="stat-chip good"><span class="sc-label">Match Rate</span><span class="sc-val">${data.total ? Math.round(data.matched/data.total*100) : 0}%</span></div>
+    ${fromRef > 0 ? `<div class="stat-chip info"><span class="sc-label">From Ref</span><span class="sc-val">${fromRef}</span></div>` : ''}
   `;
   document.getElementById('msgTbody').innerHTML = data.preview.map(row => {
     const badge = row.match_type === 'none'  ? '<span class="badge badge-none">—</span>'
                 : row.match_type === 'exact' ? '<span class="badge badge-exact">Exact</span>'
                 : `<span class="badge badge-fuzzy">${esc(row.match_type)}</span>`;
-    return `<tr class="${row.has_match ? 'row-match' : ''}">
+    const refTag = row.from_ref ? ' <span class="badge badge-ref" title="Message from output reference file">ref</span>' : '';
+    return `<tr class="${row.from_ref ? 'row-ref' : row.has_match ? 'row-match' : ''}">
       <td>${esc(row.int_name)}</td>
       <td>${esc(row.company)}</td>
       <td>${esc(row.new_name)}</td>
       <td style="max-width:160px">${esc(row.new_title)}</td>
-      <td>${badge}</td>
+      <td>${badge}${refTag}</td>
       <td>${esc(row.subject)}</td>
       <td style="color:var(--muted2);font-style:italic">${esc(row.body_short)}</td>
       <td>${esc(row.fu_subject)}</td>

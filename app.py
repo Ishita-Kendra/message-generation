@@ -157,6 +157,79 @@ def generate_followup(new_first, company, int_first, new_title, contact_index):
     return body
 
 
+# ── Output reference loader ───────────────────────────────────────────────────
+
+def load_output_reference():
+    """
+    Find the output-type reference file, read its column headers and all
+    existing messages indexed by (company_key, contact_name_lower).
+    Returns (columns_list, messages_dict).
+    """
+    manifest = load_manifest()
+    for entry in sorted(manifest, key=lambda e: e.get('uploaded_at', ''), reverse=True):
+        if entry.get('type') != 'output':
+            continue
+        path = os.path.join(REFERENCE_DIR, entry['name'])
+        if not os.path.exists(path):
+            continue
+        try:
+            # Detect header row (try rows 2, 1, 0)
+            ref_df = None
+            for hdr in [2, 1, 0]:
+                try:
+                    df = pd.read_excel(path, header=hdr, engine='openpyxl')
+                    named = [c for c in df.columns if not str(c).startswith('Unnamed')]
+                    if len(named) >= 5:
+                        ref_df = df[named]
+                        break
+                except Exception:
+                    continue
+            if ref_df is None:
+                continue
+
+            cols = list(ref_df.columns)
+
+            # Locate key columns (case-insensitive)
+            def _fc(df, *kws):
+                for c in df.columns:
+                    cl = str(c).lower()
+                    if all(k in cl for k in kws):
+                        return c
+                for c in df.columns:
+                    cl = str(c).lower()
+                    if any(k in cl for k in kws):
+                        return c
+                return None
+
+            co_col      = _fc(ref_df, 'company')
+            name_col    = _fc(ref_df, 'new contact name') or _fc(ref_df, 'new', 'name')
+            subj_col    = _fc(ref_df, 'main body subject') or _fc(ref_df, 'main', 'subject')
+            body_col    = _fc(ref_df, 'main body') or _fc(ref_df, 'main', 'body')
+            fu_subj_col = _fc(ref_df, 'follow', 'subject')
+            fu_body_col = _fc(ref_df, 'follow', 'body')
+
+            messages = {}
+            if co_col and name_col:
+                for _, row in ref_df.iterrows():
+                    co_key  = clean_company(safe_str(row.get(co_col, '')))
+                    contact = safe_str(row.get(name_col, '')).lower().strip()
+                    if not co_key or not contact:
+                        continue
+                    messages[(co_key, contact)] = {
+                        'subject':    safe_str(row.get(subj_col,    '')) if subj_col    else '',
+                        'body':       safe_str(row.get(body_col,    '')) if body_col    else '',
+                        'fu_subject': safe_str(row.get(fu_subj_col, '')) if fu_subj_col else '',
+                        'fu_body':    safe_str(row.get(fu_body_col, '')) if fu_body_col else '',
+                    }
+
+            return cols, messages
+
+        except Exception as e:
+            print(f'[output-ref] Could not load {entry["name"]}: {e}')
+
+    return list(OUTPUT_COLUMNS), {}
+
+
 # ── Manifest helpers ──────────────────────────────────────────────────────────
 
 def load_manifest():
@@ -380,7 +453,7 @@ def lookup_company(co_raw, co_map, fuzzy_thresh=80):
 
 # ── Core matching logic ───────────────────────────────────────────────────────
 
-def build_output_rows(int_df, org_df):
+def build_output_rows(int_df, org_df, ref_messages=None):
     int_co_col = find_col(int_df, 'company','organization','org','employer','firm','account')
     org_co_col = find_col(org_df, 'company','organization','org','employer','firm','account')
 
@@ -394,14 +467,16 @@ def build_output_rows(int_df, org_df):
     org_email_col = find_col(org_df, 'email','mail')
 
     co_map = build_company_map(int_df, int_co_col)
+    if ref_messages is None:
+        ref_messages = {}
 
     # Track how many new contacts we've generated per company (for subject variation)
     company_contact_count = {}
     rows_out = []
 
     for _, row in org_df.iterrows():
-        co_raw   = safe_str(row.get(org_co_col, ''))
-        new_name = extract_name(row, org_df)
+        co_raw    = safe_str(row.get(org_co_col, ''))
+        new_name  = extract_name(row, org_df)
         new_first = new_name.split()[0] if new_name else 'there'
         new_title = safe_str(row.get(org_title_col, '')) if org_title_col else ''
         new_email = safe_str(row.get(org_email_col, '')) if org_email_col else ''
@@ -417,30 +492,40 @@ def build_output_rows(int_df, org_df):
                 'new_email': new_email, 'new_location': new_loc,
                 'subject': '', 'body': '', 'fu_subject': '', 'fu_body': '',
                 'notes': '', 'match_type': 'none', 'has_match': False,
+                'from_ref': False,
             })
             continue
 
-        interested = entry['contacts']  # list of {name,title,location,email}
+        interested      = entry['contacts']
         company_display = co_raw or entry['display']
-
-        # Use primary interested contact for column data; mention all in message
-        primary = interested[0]
-        int_names_str = format_contacts([c['name'] for c in interested])
-
-        co_key = clean_company(co_raw) or clean_company(entry['display'])
-        idx = company_contact_count.get(co_key, 0)
+        primary         = interested[0]
+        int_names_str   = format_contacts([c['name'] for c in interested])
+        co_key          = clean_company(co_raw) or clean_company(entry['display'])
+        idx             = company_contact_count.get(co_key, 0)
         company_contact_count[co_key] = idx + 1
 
-        subject    = generate_subject(company_display, new_title, idx)
-        main_body  = generate_main_body(
-            new_first, new_title, company_display,
-            int_names_str, primary['title'], primary['location'], idx
-        )
-        fu_subject = f"Re: {subject}"
-        fu_body    = generate_followup(
-            new_first, company_display,
-            primary['name'].split()[0], new_title, idx
-        )
+        # ── Try to reuse messages from the output reference file ──────────────
+        ref_key = (co_key, new_name.lower().strip())
+        from_ref = False
+        if ref_key in ref_messages and ref_messages[ref_key].get('body'):
+            msgs     = ref_messages[ref_key]
+            subject    = msgs['subject']
+            main_body  = msgs['body']
+            fu_subject = msgs['fu_subject']
+            fu_body    = msgs['fu_body']
+            from_ref   = True
+        else:
+            # Generate fresh messages following the reference style/templates
+            subject    = generate_subject(company_display, new_title, idx)
+            main_body  = generate_main_body(
+                new_first, new_title, company_display,
+                int_names_str, primary['title'], primary['location'], idx
+            )
+            fu_subject = f"Re: {subject}"
+            fu_body    = generate_followup(
+                new_first, company_display,
+                primary['name'].split()[0], new_title, idx
+            )
 
         rows_out.append({
             'int_name':     int_names_str,
@@ -456,34 +541,64 @@ def build_output_rows(int_df, org_df):
             'body':         main_body,
             'fu_subject':   fu_subject,
             'fu_body':      fu_body,
-            'notes':        '',
+            'notes':        '✓ from reference' if from_ref else '',
             'match_type':   match_type,
             'has_match':    True,
+            'from_ref':     from_ref,
         })
 
     return rows_out
 
 
-def rows_to_df(rows_out):
+def rows_to_df(rows_out, out_cols=None):
+    """Convert output rows to a DataFrame using the reference column names."""
+    if out_cols is None:
+        out_cols = list(OUTPUT_COLUMNS)
+
+    # Map our internal field names to the reference column names (flexible)
+    # We match by keyword so it works even if the reference renames columns slightly.
+    def pick_col(cols, *keywords):
+        for kw in keywords:
+            for c in cols:
+                if kw.lower() in str(c).lower():
+                    return c
+        return None
+
+    col_int_name  = pick_col(out_cols, 'interested person contacted', 'interested person', 'interested')
+    col_int_title = pick_col(out_cols, 'interested person title')
+    col_int_loc   = pick_col(out_cols, 'interested person location')
+    col_int_email = pick_col(out_cols, 'interested person email')
+    col_company   = pick_col(out_cols, 'company')
+    col_new_name  = pick_col(out_cols, 'new contact name', 'new contact')
+    col_new_title = pick_col(out_cols, 'new contact title')
+    col_new_email = pick_col(out_cols, 'new contact email')
+    col_new_loc   = pick_col(out_cols, 'new contact location')
+    col_subj      = pick_col(out_cols, 'main body subject')
+    col_body      = pick_col(out_cols, 'main body')
+    col_fu_subj   = pick_col(out_cols, 'follow-up subject', 'followup subject', 'follow up subject')
+    col_fu_body   = pick_col(out_cols, 'follow-up body', 'followup body', 'follow up body')
+    col_notes     = pick_col(out_cols, 'notes', 'flags')
+
     data = []
     for r in rows_out:
-        data.append({
-            'Interested Person Contacted': r['int_name'],
-            'Interested Person Title':     r['int_title'],
-            'Interested Person Location':  r['int_location'],
-            'Interested Person Email':     r['int_email'],
-            'Company':                     r['company'],
-            'New Contact Name':            r['new_name'],
-            'New Contact Title':           r['new_title'],
-            'New Contact Email':           r['new_email'],
-            'New Contact Location':        r['new_location'],
-            'Main Body Subject':           r['subject'],
-            'Main Body':                   r['body'],
-            'Follow-up Subject':           r['fu_subject'],
-            'Follow-up Body':              r['fu_body'],
-            'Notes / Flags':               r['notes'],
-        })
-    return pd.DataFrame(data, columns=OUTPUT_COLUMNS)
+        row = {}
+        if col_int_name:  row[col_int_name]  = r['int_name']
+        if col_int_title: row[col_int_title] = r['int_title']
+        if col_int_loc:   row[col_int_loc]   = r['int_location']
+        if col_int_email: row[col_int_email] = r['int_email']
+        if col_company:   row[col_company]   = r['company']
+        if col_new_name:  row[col_new_name]  = r['new_name']
+        if col_new_title: row[col_new_title] = r['new_title']
+        if col_new_email: row[col_new_email] = r['new_email']
+        if col_new_loc:   row[col_new_loc]   = r['new_location']
+        if col_subj:      row[col_subj]      = r['subject']
+        if col_body:      row[col_body]      = r['body']
+        if col_fu_subj:   row[col_fu_subj]   = r['fu_subject']
+        if col_fu_body:   row[col_fu_body]   = r['fu_body']
+        if col_notes:     row[col_notes]     = r['notes']
+        data.append(row)
+
+    return pd.DataFrame(data, columns=out_cols)
 
 
 # ── Resolve input files ───────────────────────────────────────────────────────
@@ -521,12 +636,14 @@ def preview():
     int_df, org_df, err = resolve_inputs(request)
     if err:
         return jsonify({'ok': False, 'error': err}), 400
+    out_cols, ref_messages = load_output_reference()
     try:
-        rows_out = build_output_rows(int_df, org_df)
+        rows_out = build_output_rows(int_df, org_df, ref_messages)
     except ValueError as e:
         return jsonify({'ok': False, 'error': str(e)}), 400
 
-    matched = sum(1 for r in rows_out if r['has_match'])
+    matched   = sum(1 for r in rows_out if r['has_match'])
+    from_ref  = sum(1 for r in rows_out if r.get('from_ref'))
     preview_rows = [{
         'int_name':      r['int_name'],
         'company':       r['company'],
@@ -538,10 +655,12 @@ def preview():
         'fu_body_short': r['fu_body'][:120] + '…' if r['fu_body'] else '',
         'match_type':    r['match_type'],
         'has_match':     r['has_match'],
+        'from_ref':      r.get('from_ref', False),
     } for r in rows_out[:100]]
 
     return jsonify({'ok': True, 'total': len(rows_out),
                     'matched': matched, 'unmatched': len(rows_out) - matched,
+                    'from_ref': from_ref,
                     'preview': preview_rows})
 
 
@@ -550,12 +669,13 @@ def generate():
     int_df, org_df, err = resolve_inputs(request)
     if err:
         return jsonify({'ok': False, 'error': err}), 400
+    out_cols, ref_messages = load_output_reference()
     try:
-        rows_out = build_output_rows(int_df, org_df)
+        rows_out = build_output_rows(int_df, org_df, ref_messages)
     except ValueError as e:
         return jsonify({'ok': False, 'error': str(e)}), 400
 
-    out_df = rows_to_df(rows_out)
+    out_df  = rows_to_df(rows_out, out_cols)
     matched = sum(1 for r in rows_out if r['has_match'])
 
     buf = io.BytesIO()
@@ -573,7 +693,7 @@ def generate():
         ws.cell(row=1, column=1).fill = PatternFill(start_color='111520',
                                                      end_color='111520', fill_type='solid')
         ws.merge_cells(start_row=1, start_column=1,
-                       end_row=1,   end_column=len(OUTPUT_COLUMNS))
+                       end_row=1,   end_column=len(out_cols))
 
         # Style header row (row 3)
         header_fill = PatternFill(start_color='1e2436', end_color='1e2436', fill_type='solid')
@@ -584,37 +704,37 @@ def generate():
             cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
         ws.row_dimensions[3].height = 28
 
-        # Highlight matched rows (light green), unmatched (subtle)
+        # Highlight matched rows (light green), ref-reused rows (blue tint), unmatched (subtle)
         green_fill = PatternFill(start_color='0d2818', end_color='0d2818', fill_type='solid')
+        blue_fill  = PatternFill(start_color='0d1a2e', end_color='0d1a2e', fill_type='solid')
         grey_fill  = PatternFill(start_color='161620', end_color='161620', fill_type='solid')
         for row_idx, r in enumerate(rows_out, start=4):
-            fill = green_fill if r['has_match'] else grey_fill
-            for col_idx in range(1, len(OUTPUT_COLUMNS) + 1):
+            if r.get('from_ref'):
+                fill = blue_fill
+            elif r['has_match']:
+                fill = green_fill
+            else:
+                fill = grey_fill
+            for col_idx in range(1, len(out_cols) + 1):
                 ws.cell(row=row_idx, column=col_idx).fill = fill
             # Wrap text for body columns
-            for col_name in ('Main Body', 'Follow-up Body'):
-                c_idx = OUTPUT_COLUMNS.index(col_name) + 1
-                ws.cell(row=row_idx, column=c_idx).alignment = Alignment(wrap_text=True, vertical='top')
+            for col_name in out_cols:
+                cl = col_name.lower()
+                if 'body' in cl and 'subject' not in cl:
+                    c_idx = out_cols.index(col_name) + 1
+                    ws.cell(row=row_idx, column=c_idx).alignment = Alignment(wrap_text=True, vertical='top')
 
-        # Column widths
-        widths = {
-            'Interested Person Contacted': 28,
-            'Interested Person Title': 36,
-            'Interested Person Location': 24,
-            'Interested Person Email': 28,
-            'Company': 22,
-            'New Contact Name': 24,
-            'New Contact Title': 36,
-            'New Contact Email': 28,
-            'New Contact Location': 20,
-            'Main Body Subject': 44,
-            'Main Body': 55,
-            'Follow-up Subject': 44,
-            'Follow-up Body': 55,
-            'Notes / Flags': 18,
+        # Column widths (defaults + overrides for known wide columns)
+        default_widths = {
+            'Interested Person Contacted': 28, 'Interested Person Title': 36,
+            'Interested Person Location': 24,  'Interested Person Email': 28,
+            'Company': 22, 'New Contact Name': 24, 'New Contact Title': 36,
+            'New Contact Email': 28, 'New Contact Location': 20,
+            'Main Body Subject': 44, 'Main Body': 55,
+            'Follow-up Subject': 44, 'Follow-up Body': 55, 'Notes / Flags': 18,
         }
-        for i, col in enumerate(OUTPUT_COLUMNS, 1):
-            ws.column_dimensions[get_column_letter(i)].width = widths.get(col, 20)
+        for i, col in enumerate(out_cols, 1):
+            ws.column_dimensions[get_column_letter(i)].width = default_widths.get(col, 20)
 
         ws.freeze_panes = 'A4'
 

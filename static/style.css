@@ -302,6 +302,8 @@ button.loading{opacity:.6;pointer-events:none}
 .badge-fuzzy{background:rgba(245,158,11,.15);color:var(--yellow)}
 .badge-none{background:rgba(90,99,128,.15);color:var(--muted2)}
 .badge-dup{background:rgba(239,68,68,.15);color:var(--red)}
+.badge-ref{background:rgba(56,189,248,.15);color:var(--ref);margin-left:4px}
+.data-table tr.row-ref td{background:rgba(56,189,248,.04)}
 
 .table-note{font-size:11px;color:var(--muted);margin-top:8px;text-align:right}
 .dup-list-title{font-size:12px;font-weight:600;color:var(--red);margin-bottom:10px}
