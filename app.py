@@ -33,6 +33,132 @@ OUTPUT_COLUMNS = [
     'Notes / Flags',
 ]
 
+# ── Reference doc style rules ────────────────────────────────────────────────
+
+# Known corrections always applied (from Ebru's feedback document)
+_KNOWN_CORRECTIONS = [
+    # Title / signature fixes
+    (r'(?<!\bProf\. )(?<!\bProf\. Dr\.-Ing\. )Dr\.[ \t]+Dieter[ \t]+Gerling',
+     'Prof. Dr.-Ing. Dieter Gerling'),
+    (r'Founder\s*&\s*Co-Founder',         'Founder'),
+    (r'\bCo-Founder,\s*FEAAM',            'Founder, FEAAM'),
+    # Architecture phrasing
+    (r'(?<!patented )stator flux barrier motor architecture',
+     'patented stator flux barrier motor architecture'),
+    # Vague / weak language flagged by Ebru
+    (r'\bsignificantly\b',               'considerably'),
+    (r'\bnovel\b',                        'advanced'),
+    (r"\bI believe\b",                    'Based on your work'),
+    (r"\bI think\b",                      ''),
+    (r"\bI noticed\b",                    ''),
+    (r"\bshowing promise\b",              'demonstrated in practice'),
+    (r"\bvaluable asset\b",               'strategic capability'),
+    (r"\bwe['']ve helped\b",              "our architecture has been evaluated"),
+    (r"\bWe['']ve helped\b",              "Our architecture has been evaluated"),
+    # Battery/motor precision
+    (r'\bbattery performance\b',          'motor efficiency and energy consumption'),
+    # Greeting fix — never start with just a name
+    (r'^([A-Z][a-z]+),\n',               r'Hi \1,\n'),
+]
+
+def _load_docx_text(path):
+    """Return full text of a .docx file, or '' on failure."""
+    try:
+        from docx import Document
+        doc = Document(path)
+        return '\n'.join(p.text for p in doc.paragraphs)
+    except Exception as e:
+        print(f'[docx] Could not read {path}: {e}')
+        return ''
+
+
+def _parse_corrections_from_text(text):
+    """
+    Scan text from a correction document for explicit wrong→right phrase pairs.
+    Detects patterns like:
+      "wrong phrase" → correct phrase
+      "wrong phrase" should be "correct phrase"
+      Replace "wrong" with "correct"
+    Returns list of (raw_wrong, raw_right) string tuples.
+    """
+    found = []
+    # Normalise smart quotes to regular quotes for easier parsing
+    text = text.replace('“', '"').replace('”', '"') \
+               .replace('‘', "'").replace('’', "'")
+
+    # Pattern A: "X" → Y  or  "X" -> Y
+    pat_arrow = re.compile(r'"([^"]{4,80})"\s*(?:→|->)\s*"?([^"\n]{4,120})"?')
+    for m in pat_arrow.finditer(text):
+        wrong, right = m.group(1).strip(), m.group(2).strip()
+        if wrong and right and wrong.lower() != right.lower():
+            found.append((wrong, right))
+
+    # Pattern B: "X" should be "Y"
+    pat_should = re.compile(r'"([^"]{4,80})"\s+should be\s+"([^"]{4,120})"', re.IGNORECASE)
+    for m in pat_should.finditer(text):
+        wrong, right = m.group(1).strip(), m.group(2).strip()
+        if wrong and right and wrong.lower() != right.lower():
+            found.append((wrong, right))
+
+    # Pattern C: Replace "X" with "Y"
+    pat_replace = re.compile(r'[Rr]eplace\s+"([^"]{4,80})"\s+with\s+"([^"]{4,120})"')
+    for m in pat_replace.finditer(text):
+        wrong, right = m.group(1).strip(), m.group(2).strip()
+        if wrong and right and wrong.lower() != right.lower():
+            found.append((wrong, right))
+
+    return found
+
+
+def load_ref_doc_rules():
+    """
+    Read all 'reference' type .docx files and build a combined list of
+    (compiled_regex, replacement) correction rules.
+    Always includes the known Ebru corrections plus any new ones parsed from the docs.
+    """
+    rules = []
+
+    # 1. Always apply the known corrections
+    for pattern, repl in _KNOWN_CORRECTIONS:
+        try:
+            rules.append((re.compile(pattern, re.MULTILINE), repl))
+        except re.error:
+            pass
+
+    # 2. Dynamically parse reference .docx files for additional corrections
+    manifest = []
+    if os.path.exists(MANIFEST_PATH):
+        with open(MANIFEST_PATH) as f:
+            manifest = json.load(f)
+
+    for entry in manifest:
+        if entry.get('type') != 'reference':
+            continue
+        path = os.path.join(REFERENCE_DIR, entry['name'])
+        if not os.path.exists(path) or not path.lower().endswith(('.docx', '.doc')):
+            continue
+        text = _load_docx_text(path)
+        if not text:
+            continue
+        for wrong, right in _parse_corrections_from_text(text):
+            try:
+                rules.append((re.compile(re.escape(wrong)), right))
+            except re.error:
+                pass
+
+    return rules
+
+
+def apply_ref_corrections(text, rules):
+    """Apply all correction rules to a message body string."""
+    for pattern, replacement in rules:
+        text = pattern.sub(replacement, text)
+    # Clean up any double spaces left by removals
+    text = re.sub(r'  +', ' ', text)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text.strip()
+
+
 # ── Executive / title-level detection ────────────────────────────────────────
 
 EXEC_KEYWORDS = {
@@ -538,7 +664,7 @@ def lookup_company(co_raw, co_map, fuzzy_thresh=80):
 
 # ── Core matching logic ───────────────────────────────────────────────────────
 
-def build_output_rows(int_df, org_df, ref_messages=None):
+def build_output_rows(int_df, org_df, ref_messages=None, correction_rules=None):
     int_co_col = find_col(int_df, 'company','organization','org','employer','firm','account')
     org_co_col = find_col(org_df, 'company','organization','org','employer','firm','account')
 
@@ -554,6 +680,8 @@ def build_output_rows(int_df, org_df, ref_messages=None):
     co_map = build_company_map(int_df, int_co_col)
     if ref_messages is None:
         ref_messages = {}
+    if correction_rules is None:
+        correction_rules = []
 
     # Track how many new contacts we've generated per company (for subject variation)
     company_contact_count = {}
@@ -611,6 +739,12 @@ def build_output_rows(int_df, org_df, ref_messages=None):
                 new_first, company_display,
                 primary['name'].split()[0], new_title, idx
             )
+            # Apply corrections from reference .docx files
+            if correction_rules:
+                main_body  = apply_ref_corrections(main_body,  correction_rules)
+                fu_body    = apply_ref_corrections(fu_body,    correction_rules)
+                subject    = apply_ref_corrections(subject,    correction_rules)
+                fu_subject = apply_ref_corrections(fu_subject, correction_rules)
 
         rows_out.append({
             'int_name':     int_names_str,
@@ -722,8 +856,9 @@ def preview():
     if err:
         return jsonify({'ok': False, 'error': err}), 400
     out_cols, ref_messages, _ = load_output_reference()
+    correction_rules = load_ref_doc_rules()
     try:
-        rows_out = build_output_rows(int_df, org_df, ref_messages)
+        rows_out = build_output_rows(int_df, org_df, ref_messages, correction_rules)
     except ValueError as e:
         return jsonify({'ok': False, 'error': str(e)}), 400
 
@@ -755,8 +890,9 @@ def generate():
     if err:
         return jsonify({'ok': False, 'error': err}), 400
     out_cols, ref_messages, style = load_output_reference()
+    correction_rules = load_ref_doc_rules()
     try:
-        rows_out = build_output_rows(int_df, org_df, ref_messages)
+        rows_out = build_output_rows(int_df, org_df, ref_messages, correction_rules)
     except ValueError as e:
         return jsonify({'ok': False, 'error': str(e)}), 400
 
