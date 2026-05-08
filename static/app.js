@@ -363,10 +363,12 @@ function renderMsgPreview(data) {
       <td>${esc(row.int_name)}</td>
       <td>${esc(row.company)}</td>
       <td>${esc(row.new_name)}</td>
-      <td style="max-width:180px">${esc(row.new_title)}</td>
+      <td style="max-width:160px">${esc(row.new_title)}</td>
       <td>${badge}</td>
       <td>${esc(row.subject)}</td>
       <td style="color:var(--muted2);font-style:italic">${esc(row.body_short)}</td>
+      <td>${esc(row.fu_subject)}</td>
+      <td style="color:var(--muted2);font-style:italic">${esc(row.fu_body_short)}</td>
     </tr>`;
   }).join('');
   document.getElementById('msgNote').textContent = data.total > 100

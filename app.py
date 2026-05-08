@@ -528,14 +528,16 @@ def preview():
 
     matched = sum(1 for r in rows_out if r['has_match'])
     preview_rows = [{
-        'int_name':   r['int_name'],
-        'company':    r['company'],
-        'new_name':   r['new_name'],
-        'new_title':  r['new_title'],
-        'subject':    r['subject'],
-        'body_short': r['body'][:120] + '…' if r['body'] else '',
-        'match_type': r['match_type'],
-        'has_match':  r['has_match'],
+        'int_name':      r['int_name'],
+        'company':       r['company'],
+        'new_name':      r['new_name'],
+        'new_title':     r['new_title'],
+        'subject':       r['subject'],
+        'body_short':    r['body'][:120] + '…' if r['body'] else '',
+        'fu_subject':    r['fu_subject'],
+        'fu_body_short': r['fu_body'][:120] + '…' if r['fu_body'] else '',
+        'match_type':    r['match_type'],
+        'has_match':     r['has_match'],
     } for r in rows_out[:100]]
 
     return jsonify({'ok': True, 'total': len(rows_out),
