@@ -380,16 +380,16 @@ async function runGenerate() {
   const btn = document.getElementById('msgDownloadBtn');
   btn.classList.add('loading');
   try {
-    const res = await fetch('/api/generate', { method: 'POST', body: buildMsgForm() });
+    const res  = await fetch('/api/generate', { method: 'POST', body: buildMsgForm() });
+    const data = await res.json();
     btn.classList.remove('loading');
-    if (!res.ok) {
-      const d = await res.json().catch(() => ({}));
-      showStatus('msgStatus', `Error: ${d.error || res.statusText}`, 'error');
+    if (!data.ok) {
+      showStatus('msgStatus', `Error: ${data.error || 'Unknown error'}`, 'error');
       return;
     }
     hideStatus('msgStatus');
-    triggerDownload(await res.blob(), 'feaam_messages.xlsx');
-    showStatus('msgStatus', 'Excel downloaded.', 'success');
+    window.open('/api/download/' + data.token, '_blank');
+    showStatus('msgStatus', 'Excel download started.', 'success');
     await loadReferenceFiles();
   } catch (err) {
     btn.classList.remove('loading');
@@ -445,15 +445,15 @@ async function runDedupDownload() {
   const btn = document.getElementById('dedupDownloadBtn');
   btn.classList.add('loading');
   try {
-    const res = await fetch('/api/dedup-download', { method: 'POST', body: buildDedupForm() });
+    const res  = await fetch('/api/dedup-download', { method: 'POST', body: buildDedupForm() });
+    const data = await res.json();
     btn.classList.remove('loading');
-    if (!res.ok) {
-      const d = await res.json().catch(() => ({}));
-      showStatus('dedupStatus', `Error: ${d.error || res.statusText}`, 'error');
+    if (!data.ok) {
+      showStatus('dedupStatus', `Error: ${data.error || 'Unknown error'}`, 'error');
       return;
     }
     hideStatus('dedupStatus');
-    triggerDownload(await res.blob(), 'feaam_deduplication.xlsx');
+    window.open('/api/download/' + data.token, '_blank');
     showStatus('dedupStatus', 'Report downloaded.', 'success');
     await loadReferenceFiles();
   } catch (err) {

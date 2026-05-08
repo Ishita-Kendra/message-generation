@@ -1,4 +1,4 @@
-import io, os, re, json, shutil
+import io, os, re, json, shutil, uuid, tempfile
 from datetime import datetime
 from flask import Flask, render_template, jsonify, request, send_file
 import pandas as pd
@@ -12,6 +12,9 @@ app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024
 REFERENCE_DIR  = os.path.join(os.path.dirname(__file__), 'reference_files')
 MANIFEST_PATH  = os.path.join(REFERENCE_DIR, '_manifest.json')
 os.makedirs(REFERENCE_DIR, exist_ok=True)
+
+# One-time download tokens  {token: (filepath, filename)}
+_download_store = {}
 
 OUTPUT_COLUMNS = [
     'Interested Person Contacted',
@@ -613,9 +616,36 @@ def generate():
 
         ws.freeze_panes = 'A4'
 
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx')
     buf.seek(0)
-    return send_file(buf, download_name='FEAAM_Outreach_Messages.xlsx', as_attachment=True,
-                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    tmp.write(buf.read())
+    tmp.close()
+    token = uuid.uuid4().hex
+    _download_store[token] = (tmp.name, 'FEAAM_Outreach_Messages.xlsx')
+    return jsonify({'ok': True, 'token': token})
+
+
+@app.route('/api/download/<token>')
+def download_file(token):
+    entry = _download_store.pop(token, None)
+    if not entry:
+        return 'Download link expired or invalid.', 404
+    filepath, filename = entry
+    if not os.path.exists(filepath):
+        return 'File not found.', 404
+    response = send_file(
+        filepath,
+        download_name=filename,
+        as_attachment=True,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    @response.call_on_close
+    def _cleanup():
+        try:
+            os.unlink(filepath)
+        except OSError:
+            pass
+    return response
 
 
 # ── Deduplication routes ──────────────────────────────────────────────────────
@@ -733,10 +763,13 @@ def dedup_download():
                 ws.cell(row=r, column=s_idx).font = Font(color='c62828', bold=True)
         for i in range(1, len(out_df.columns) + 1):
             ws.column_dimensions[get_column_letter(i)].width = 22
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx')
     buf.seek(0)
-
-    return send_file(buf, download_name='feaam_deduplication.xlsx', as_attachment=True,
-                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    tmp.write(buf.read())
+    tmp.close()
+    token = uuid.uuid4().hex
+    _download_store[token] = (tmp.name, 'FEAAM_Deduplication.xlsx')
+    return jsonify({'ok': True, 'token': token})
 
 
 # ── Health / Index ────────────────────────────────────────────────────────────
