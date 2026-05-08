@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>FEAAM Outreach Studio</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0b0d13;--bg2:#111520;--bg3:#181d2a;--bg4:#1e2436;--border:#232840;--border2:#2d3450;
+--text:#e4e8f4;--muted:#5a6380;--muted2:#7a85a8;--green:#22c55e;--yellow:#f59e0b;--red:#ef4444;
+--blue:#38bdf8;--msg:#7c6ef7;--dedup:#f97316;--ref:#38bdf8;--r:10px;}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:13px;min-height:100vh}
+header{display:flex;align-items:center;padding:14px 24px;background:var(--bg2);border-bottom:1px solid var(--border);gap:12px}
+.header-brand{display:flex;align-items:center;gap:12px}
+.brand-dot{width:34px;height:34px;border-radius:9px;flex-shrink:0;background:linear-gradient(135deg,var(--msg),var(--blue));box-shadow:0 0 18px rgba(124,110,247,.2)}
+h1{font-size:17px;font-weight:700;letter-spacing:-.3px}
+.brand-sub{font-size:11px;color:var(--muted2);display:block;margin-top:2px}
+.page-section{margin:20px 24px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:20px}
+.dedup-section{border-color:#2d2415}.ref-section{border-color:#1a2a3a}
+.section-toolbar{display:flex;align-items:center;gap:14px;margin-bottom:16px;flex-wrap:wrap}
+.section-label{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600}
+.msg-label{color:var(--msg)}.dedup-label{color:var(--dedup)}.ref-label{color:var(--ref)}
+.section-hint{font-size:11px;color:var(--muted2)}
+.btn-add-ref{margin-left:auto;display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:7px;cursor:pointer;background:rgba(56,189,248,.12);border:1px solid rgba(56,189,248,.3);color:var(--ref);font-size:12px;font-weight:600;transition:background .15s}
+.btn-add-ref:hover{background:rgba(56,189,248,.2)}
+.ref-dropzone{min-height:100px;border-radius:8px;border:2px dashed var(--border2);padding:12px;transition:border-color .2s,background .2s}
+.ref-dropzone.drag-over{border-color:var(--ref);background:rgba(56,189,248,.05)}
+.ref-file-grid{display:flex;flex-wrap:wrap;gap:10px}
+.ref-empty{width:100%;display:flex;flex-direction:column;align-items:center;gap:8px;padding:24px;color:var(--muted);font-size:12px;text-align:center}
+.ref-file-card{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:10px;min-width:200px;max-width:280px;flex:1}
+.ref-file-icon{width:30px;height:36px;border-radius:4px;flex-shrink:0;background:rgba(34,197,94,.15);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--green);letter-spacing:.3px}
+.ref-file-info{flex:1;min-width:0}
+.ref-file-name{font-size:12px;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ref-file-meta{font-size:10px;color:var(--muted);margin-top:2px}
+.ref-file-delete{color:var(--muted);cursor:pointer;font-size:15px;flex-shrink:0;padding:2px 4px;border-radius:4px;transition:color .15s}
+.ref-file-delete:hover{color:var(--red)}
+.ref-tab-bar{display:flex;gap:4px;margin-bottom:10px;border-bottom:1px solid var(--border)}
+.ref-tab{display:flex;align-items:center;gap:6px;padding:7px 14px;border:1px solid transparent;border-bottom:none;border-radius:7px 7px 0 0;background:transparent;color:var(--muted2);font-size:12px;font-weight:600;cursor:pointer;margin-bottom:-1px;transition:color .15s,background .15s}
+.ref-tab:hover{color:var(--text);background:var(--bg3)}
+.ref-tab.active{color:var(--ref);background:var(--bg3);border-color:var(--border);border-bottom-color:var(--bg3)}
+#tabOutRef.active{color:var(--green)}
+.out-ref-hint{width:100%;text-align:center;font-size:10px;color:var(--muted);padding-top:6px}
+.upload-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
+@media(max-width:700px){.upload-grid{grid-template-columns:1fr}}
+.upload-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.upload-card-header{padding:10px 14px 8px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.upload-card-hint{font-size:11px;color:var(--muted2)}
+.upload-tag{font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;padding:2px 8px;border-radius:4px;flex-shrink:0}
+.interested-tag{background:rgba(124,110,247,.18);color:var(--msg)}
+.org-tag{background:rgba(56,189,248,.15);color:var(--blue)}
+.ref-tag{background:rgba(34,197,94,.15);color:var(--green)}
+.others-tag{background:rgba(249,115,22,.15);color:var(--dedup)}
+.file-select-body{padding:12px}
+.ref-select-wrap{margin-bottom:4px}.multi-ref-wrap{margin-bottom:4px}
+.multi-ref-label{font-size:11px;color:var(--muted2);margin-bottom:6px}
+.ref-select{width:100%;background:var(--bg4);border:1px solid var(--border2);border-radius:7px;padding:7px 10px;color:var(--text);font-size:12px;outline:none;cursor:pointer}
+.ref-select:focus{border-color:var(--blue)}
+.ref-checklist{display:flex;flex-direction:column;gap:4px;max-height:110px;overflow-y:auto;padding:2px}
+.ref-check-item{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;cursor:pointer;transition:background .12s;font-size:12px}
+.ref-check-item:hover{background:var(--bg4)}
+.ref-check-item input[type=checkbox]{accent-color:var(--dedup);cursor:pointer}
+.ref-check-item.checked{background:rgba(249,115,22,.08)}
+.or-divider{text-align:center;font-size:10px;color:var(--muted);margin:8px 0;position:relative}
+.or-divider::before,.or-divider::after{content:'';position:absolute;top:50%;width:42%;height:1px;background:var(--border)}
+.or-divider::before{left:0}.or-divider::after{right:0}
+.drop-zone{padding:16px;display:flex;flex-direction:column;align-items:center;gap:7px;border:2px dashed var(--border2);border-radius:8px;transition:border-color .2s,background .2s}
+.drop-zone.drag-over{border-color:var(--blue);background:rgba(56,189,248,.06)}
+.drop-zone.has-file{border-color:var(--green);border-style:solid}
+.drop-icon{width:28px;height:28px;color:var(--muted)}
+.drop-zone.has-file .drop-icon{color:var(--green)}
+.drop-text{font-size:11px;color:var(--muted2)}
+.multi-drop{border-color:rgba(249,115,22,.3)}
+.multi-drop.drag-over{border-color:var(--dedup);background:rgba(249,115,22,.06)}
+.multi-drop.has-file{border-color:var(--dedup);border-style:solid}
+.btn-upload{display:inline-block;padding:4px 12px;background:var(--bg4);border:1px solid var(--border2);border-radius:6px;font-size:11px;font-weight:500;color:var(--text);cursor:pointer;transition:border-color .15s}
+.btn-upload:hover{border-color:var(--blue);background:rgba(56,189,248,.08)}
+.file-meta{font-size:11px;color:var(--green);text-align:center;display:none}
+.file-meta.show{display:block}
+.file-list{display:flex;flex-direction:column;gap:4px;width:100%;margin-top:4px}
+.file-pill{display:flex;align-items:center;justify-content:space-between;background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px}
+.file-pill-name{color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px}
+.file-pill-remove{color:var(--muted);cursor:pointer;font-size:14px;flex-shrink:0;margin-left:6px}
+.file-pill-remove:hover{color:var(--red)}
+.action-row{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.btn-primary,.btn-success,.btn-danger{display:flex;align-items:center;gap:7px;padding:8px 18px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;transition:opacity .15s}
+.btn-primary{background:rgba(124,110,247,.25);color:var(--msg);border:1px solid rgba(124,110,247,.4)}
+.btn-primary:hover{background:rgba(124,110,247,.35)}
+.btn-success{background:rgba(34,197,94,.2);color:var(--green);border:1px solid rgba(34,197,94,.35)}
+.btn-success:hover:not(:disabled){background:rgba(34,197,94,.3)}
+.btn-danger{background:rgba(239,68,68,.2);color:var(--red);border:1px solid rgba(239,68,68,.35)}
+.btn-danger:hover:not(:disabled){background:rgba(239,68,68,.3)}
+button:disabled{opacity:.35;cursor:not-allowed}
+button.loading{opacity:.6;pointer-events:none}
+.status-bar{padding:10px 14px;border-radius:8px;font-size:12px;margin-bottom:12px}
+.status-bar.error{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#fca5a5}
+.status-bar.success{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);color:#86efac}
+.status-bar.loading{background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.2);color:var(--blue)}
+.hidden{display:none!important}
+.preview-stats{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.stat-chip{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 14px;display:flex;flex-direction:column;gap:2px}
+.stat-chip .sc-label{font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:.4px}
+.stat-chip .sc-val{font-size:18px;font-weight:700;line-height:1}
+.stat-chip.good .sc-val{color:var(--green)}.stat-chip.warn .sc-val{color:var(--yellow)}.stat-chip.bad .sc-val{color:var(--red)}.stat-chip.info .sc-val{color:var(--blue)}
+.table-wrap{overflow-x:auto;border-radius:8px;border:1px solid var(--border)}
+.data-table{width:100%;border-collapse:collapse;font-size:12px}
+.data-table th{background:var(--bg3);padding:9px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--muted2);border-bottom:1px solid var(--border);white-space:nowrap}
+.data-table td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top;max-width:260px;word-break:break-word}
+.data-table tr:last-child td{border-bottom:none}
+.data-table tr:hover td{background:rgba(255,255,255,.02)}
+.data-table tr.row-match td{background:rgba(34,197,94,.05)}
+.data-table tr.row-dup td{background:rgba(239,68,68,.05)}
+.badge{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:600;letter-spacing:.3px}
+.badge-exact{background:rgba(34,197,94,.15);color:var(--green)}
+.badge-fuzzy{background:rgba(245,158,11,.15);color:var(--yellow)}
+.badge-none{background:rgba(90,99,128,.15);color:var(--muted2)}
+.badge-dup{background:rgba(239,68,68,.15);color:var(--red)}
+.badge-ref{background:rgba(56,189,248,.15);color:var(--ref);margin-left:4px}
+.data-table tr.row-ref td{background:rgba(56,189,248,.04)}
+.table-note{font-size:11px;color:var(--muted);margin-top:8px;text-align:right}
+.dup-list-title{font-size:12px;font-weight:600;color:var(--red);margin-bottom:10px}
+footer{text-align:center;padding:16px;font-size:11px;color:var(--muted);border-top:1px solid var(--border);margin-top:10px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-brand">
+    <div class="brand-dot"></div>
+    <div>
+      <h1>FEAAM Outreach Studio</h1>
+      <span class="brand-sub">Warm-referral message generator &amp; contact deduplication &mdash; runs entirely in your browser</span>
+    </div>
+  </div>
+</header>
+
+<!-- REFERENCE FILES -->
+<div class="page-section ref-section">
+  <div class="section-toolbar">
+    <div class="section-label ref-label">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      Reference Files
+    </div>
+    <div class="section-hint">Stored in your browser — persist between sessions</div>
+    <label class="btn-add-ref">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Add Files
+      <input type="file" accept=".xlsx,.xls,.csv,.docx,.doc,.pdf" id="refAddInput" hidden multiple onchange="uploadRefFiles(this)"/>
+    </label>
+  </div>
+  <div class="ref-tab-bar">
+    <button class="ref-tab active" id="tabRefFiles" onclick="switchRefTab('reference')">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      Reference Files
+    </button>
+    <button class="ref-tab" id="tabOutRef" onclick="switchRefTab('output')">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><polyline points="8 13 10 15 14 11"/></svg>
+      Output Reference
+    </button>
+  </div>
+  <div class="ref-dropzone" id="refGlobalDrop" ondragover="onRefDragOver(event)" ondragleave="onRefDragLeave()" ondrop="onRefDrop(event)">
+    <div id="refFileGrid" class="ref-file-grid">
+      <div class="ref-empty" id="refEmpty">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        <div>No reference files yet &mdash; drop files here or click <strong>Add Files</strong></div>
+      </div>
+    </div>
+  </div>
+  <div class="ref-dropzone hidden" id="outRefGlobalDrop" ondragover="onOutRefDragOver(event)" ondragleave="onOutRefDragLeave()" ondrop="onOutRefDrop(event)">
+    <div id="outRefFileGrid" class="ref-file-grid">
+      <div class="ref-empty" id="outRefEmpty">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><polyline points="8 13 10 15 14 11"/></svg>
+        <div>Drop the output reference Excel here to map columns &amp; reuse existing messages</div>
+      </div>
+    </div>
+    <div class="out-ref-hint">Used to define output column structure and reuse previously approved messages</div>
+  </div>
+</div>
+
+<!-- MESSAGE GENERATOR -->
+<div class="page-section">
+  <div class="section-toolbar">
+    <div class="section-label msg-label">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      Message Generator
+    </div>
+    <div class="section-hint">Match by company &rarr; generate personalized messages &rarr; export Excel</div>
+  </div>
+  <div class="upload-grid">
+    <div class="upload-card">
+      <div class="upload-card-header"><div class="upload-tag interested-tag">Interested List</div><div class="upload-card-hint">People who showed interest (with company names)</div></div>
+      <div class="file-select-body">
+        <div class="ref-select-wrap"><select id="intRefSelect" class="ref-select" onchange="onRefSelectChange('intRefSelect','intDrop','intMeta')"><option value="">&#8212; Select from Reference Files &#8212;</option></select></div>
+        <div class="or-divider">or upload new</div>
+        <div class="drop-zone" id="intDrop" ondragover="onDragOver(event,'intDrop')" ondragleave="onDragLeave('intDrop')" ondrop="onDrop(event,'intFile','intDrop','intMeta')">
+          <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+          <div class="drop-text">Drop Excel/CSV or</div>
+          <label class="btn-upload">Browse<input type="file" accept=".xlsx,.xls,.csv" id="intFile" hidden onchange="onFileSelect('intFile','intMeta','intDrop','intRefSelect')"/></label>
+          <div class="file-meta" id="intMeta"></div>
+        </div>
+      </div>
+    </div>
+    <div class="upload-card">
+      <div class="upload-card-header"><div class="upload-tag org-tag">Organization List</div><div class="upload-card-hint">People associated with target organizations</div></div>
+      <div class="file-select-body">
+        <div class="ref-select-wrap"><select id="orgRefSelect" class="ref-select" onchange="onRefSelectChange('orgRefSelect','orgDrop','orgMeta')"><option value="">&#8212; Select from Reference Files &#8212;</option></select></div>
+        <div class="or-divider">or upload new</div>
+        <div class="drop-zone" id="orgDrop" ondragover="onDragOver(event,'orgDrop')" ondragleave="onDragLeave('orgDrop')" ondrop="onDrop(event,'orgFile','orgDrop','orgMeta')">
+          <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
+          <div class="drop-text">Drop Excel/CSV or</div>
+          <label class="btn-upload">Browse<input type="file" accept=".xlsx,.xls,.csv" id="orgFile" hidden onchange="onFileSelect('orgFile','orgMeta','orgDrop','orgRefSelect')"/></label>
+          <div class="file-meta" id="orgMeta"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="action-row">
+    <button class="btn-primary" onclick="runPreview()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      Preview Results
+    </button>
+    <button class="btn-success" id="msgDownloadBtn" disabled onclick="runDownload()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download Excel
+    </button>
+  </div>
+  <div id="msgStatus" class="status-bar hidden"></div>
+  <div id="msgPreviewArea" class="hidden">
+    <div class="preview-stats" id="msgStats"></div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Interested Person</th><th>Company</th><th>New Contact</th><th>Title</th><th>Match</th><th>Main Subject</th><th>Body Preview</th><th>Follow-up Subject</th><th>Follow-up Preview</th></tr></thead>
+        <tbody id="msgTbody"></tbody>
+      </table>
+    </div>
+    <div class="table-note" id="msgNote"></div>
+  </div>
+</div>
+
+<!-- DEDUPLICATION -->
+<div class="page-section dedup-section">
+  <div class="section-toolbar">
+    <div class="section-label dedup-label">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+      Deduplication
+    </div>
+    <div class="section-hint">Check your list against other files &mdash; find and flag duplicates</div>
+  </div>
+  <div class="upload-grid">
+    <div class="upload-card">
+      <div class="upload-card-header"><div class="upload-tag ref-tag">Reference Sheet</div><div class="upload-card-hint">The master list to check</div></div>
+      <div class="file-select-body">
+        <div class="ref-select-wrap"><select id="dedupRefSelect" class="ref-select" onchange="onRefSelectChange('dedupRefSelect','dedupRefDrop','dedupRefMeta')"><option value="">&#8212; Select from Reference Files &#8212;</option></select></div>
+        <div class="or-divider">or upload new</div>
+        <div class="drop-zone" id="dedupRefDrop" ondragover="onDragOver(event,'dedupRefDrop')" ondragleave="onDragLeave('dedupRefDrop')" ondrop="onDrop(event,'dedupRefFile','dedupRefDrop','dedupRefMeta')">
+          <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <div class="drop-text">Drop Excel/CSV or</div>
+          <label class="btn-upload">Browse<input type="file" accept=".xlsx,.xls,.csv" id="dedupRefFile" hidden onchange="onFileSelect('dedupRefFile','dedupRefMeta','dedupRefDrop','dedupRefSelect')"/></label>
+          <div class="file-meta" id="dedupRefMeta"></div>
+        </div>
+      </div>
+    </div>
+    <div class="upload-card">
+      <div class="upload-card-header"><div class="upload-tag others-tag">Other Sheets</div><div class="upload-card-hint">Files to check for duplicates</div></div>
+      <div class="file-select-body">
+        <div class="multi-ref-wrap"><div class="multi-ref-label">Select from Reference Files:</div><div id="othersRefChecklist" class="ref-checklist"></div></div>
+        <div class="or-divider">or upload new</div>
+        <div class="drop-zone multi-drop" id="othersDrop" ondragover="onDragOver(event,'othersDrop')" ondragleave="onDragLeave('othersDrop')" ondrop="onDropMulti(event,'othersDrop')">
+          <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M16 16l-4-4-4 4"/><path d="M12 12v9"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+          <div class="drop-text">Drop files or</div>
+          <label class="btn-upload">Browse<input type="file" accept=".xlsx,.xls,.csv" id="othersUpload" hidden multiple onchange="onMultiFileSelect(this)"/></label>
+          <div class="file-meta" id="othersMeta"></div>
+          <div id="othersFileList" class="file-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="action-row">
+    <button class="btn-primary" onclick="runDedupPreview()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      Check Duplicates
+    </button>
+    <button class="btn-danger" id="dedupDownloadBtn" disabled onclick="runDedupDownload()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download Result
+    </button>
+  </div>
+  <div id="dedupStatus" class="status-bar hidden"></div>
+  <div id="dedupPreviewArea" class="hidden">
+    <div class="preview-stats" id="dedupStats"></div>
+    <div id="dedupDupArea" class="hidden">
+      <div class="dup-list-title">Duplicate entries found:</div>
+      <div class="table-wrap">
+        <table class="data-table"><thead><tr><th>Name</th><th>Email</th><th>Reason</th></tr></thead><tbody id="dedupTbody"></tbody></table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>FEAAM Outreach Studio &middot; All processing happens in your browser &middot; Files stored locally in your browser</footer>
+
+<script>
+'use strict';
+// ── Wait for XLSX to load ─────────────────────────────────────────────────────
+function waitForXLSX(cb){if(typeof XLSX!=='undefined')cb();else setTimeout(()=>waitForXLSX(cb),100);}
+
+// ── IndexedDB storage ─────────────────────────────────────────────────────────
+const DB_NAME='feaam-studio',DB_VER=1,STORE='files';
+function openDB(){
+  return new Promise((res,rej)=>{
+    const r=indexedDB.open(DB_NAME,DB_VER);
+    r.onupgradeneeded=e=>e.target.result.createObjectStore(STORE,{keyPath:'name'});
+    r.onsuccess=e=>res(e.target.result);r.onerror=e=>rej(e.target.error);
+  });
+}
+async function dbSave(name,data){const db=await openDB();return new Promise((res,rej)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).put({name,data});tx.oncomplete=res;tx.onerror=e=>rej(e.target.error);});}
+async function dbGet(name){const db=await openDB();return new Promise((res,rej)=>{const tx=db.transaction(STORE,'readonly');const r=tx.objectStore(STORE).get(name);r.onsuccess=e=>res(e.target.result?.data);r.onerror=e=>rej(e.target.error);});}
+async function dbDel(name){const db=await openDB();return new Promise((res,rej)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).delete(name);tx.oncomplete=res;tx.onerror=e=>rej(e.target.error);});}
+
+function loadManifest(){try{return JSON.parse(localStorage.getItem('feaam-manifest')||'[]');}catch{return[];}}
+function saveManifest(m){localStorage.setItem('feaam-manifest',JSON.stringify(m));}
+
+async function saveRefFile(file,type='reference'){
+  const buf=await file.arrayBuffer();
+  const safe=file.name.replace(/[^\w.\-]/g,'_');
+  await dbSave(safe,buf);
+  let m=loadManifest().filter(e=>e.name!==safe);
+  m.push({name:safe,original_name:file.name,size:file.size,uploaded_at:new Date().toISOString().slice(0,19),type});
+  saveManifest(m);return safe;
+}
+async function deleteRefFile(name){
+  await dbDel(name);saveManifest(loadManifest().filter(e=>e.name!==name));renderReferenceFiles();
+}
+
+// ── File parsing with SheetJS ─────────────────────────────────────────────────
+async function parseFile(source){
+  // source = File object OR name string (load from IndexedDB)
+  let buf,name;
+  if(typeof source==='string'){buf=await dbGet(source);name=source;}
+  else{buf=await source.arrayBuffer();name=source.name;}
+  if(!buf)throw new Error('File not found: '+name);
+  const ext=name.split('.').pop().toLowerCase();
+  let wb;
+  if(ext==='csv'){
+    const text=new TextDecoder('utf-8',{fatal:false}).decode(buf);
+    wb=XLSX.read(text,{type:'string'});
+  }else{
+    wb=XLSX.read(new Uint8Array(buf),{type:'array'});
+  }
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  return XLSX.utils.sheet_to_json(ws,{defval:''});
+}
+
+// ── Data helpers ──────────────────────────────────────────────────────────────
+const SUFFIXES=new Set(['inc','llc','ltd','corp','co','gmbh','ag','sa','plc','limited','incorporated','corporation','company','group','holding','holdings','enterprises','solutions','services','international','global','worldwide','consulting','the']);
+
+function cleanCompany(name){
+  if(!name)return'';
+  let s=String(name).toLowerCase().trim().replace(/[.,&\-\/\\]+/g,' ');
+  return s.split(/\s+/).filter(w=>w&&!SUFFIXES.has(w)).join(' ');
+}
+
+function safeStr(v){const s=String(v??'').trim();return s.toLowerCase()==='nan'?'':s;}
+
+function findCol(row,...kws){
+  const keys=Object.keys(row);
+  const kwsN=kws.map(k=>k.toLowerCase().replace(/[\s_\-]/g,''));
+  for(const k of keys){const kl=k.toLowerCase().replace(/[\s_\-]/g,'');if(kwsN.some(q=>kl.includes(q)))return k;}
+  return null;
+}
+
+function extractName(row){
+  const keys=Object.keys(row);
+  for(const k of keys){const kl=k.toLowerCase().trim();if(['name','full name','fullname','contact name','contact'].includes(kl)){const v=safeStr(row[k]);if(v)return v;}}
+  const fk=findCol(row,'first name','firstname','first');
+  const lk=findCol(row,'last name','lastname','surname','last');
+  const f=fk?safeStr(row[fk]):'';const l=lk?safeStr(row[lk]):'';
+  if(f||l)return(f+' '+l).trim();
+  for(const k of keys){if(k.toLowerCase().includes('name')){const v=safeStr(row[k]);if(v)return v;}}
+  return'';
+}
+
+// ── Fuzzy matching ────────────────────────────────────────────────────────────
+function levenshtein(a,b){
+  const m=a.length,n=b.length;
+  const dp=Array.from({length:m+1},(_,i)=>Array.from({length:n+1},(_,j)=>i===0?j:j===0?i:0));
+  for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)dp[i][j]=a[i-1]===b[j-1]?dp[i-1][j-1]:1+Math.min(dp[i-1][j],dp[i][j-1],dp[i-1][j-1]);
+  return dp[m][n];
+}
+function tokenSortRatio(a,b){
+  const s=(x)=>x.toLowerCase().split(/\s+/).sort().join(' ');
+  const ta=s(a),tb=s(b);if(ta===tb)return 100;
+  const long=ta.length>=tb.length?ta:tb,short=ta.length<tb.length?ta:tb;
+  if(!long.length)return 100;
+  return Math.round((1-levenshtein(long,short)/long.length)*100);
+}
+function lookupCompany(name,coMap,thresh=80){
+  const key=cleanCompany(name);if(!key)return[null,'none'];
+  if(coMap[key])return[coMap[key],'exact'];
+  let best=null,bestScore=0,bestKey='';
+  for(const k of Object.keys(coMap)){const sc=tokenSortRatio(key,k);if(sc>bestScore){bestScore=sc;bestKey=k;best=coMap[k];}}
+  if(bestScore>=thresh)return[best,`fuzzy (${bestScore}%)`];
+  return[null,'none'];
+}
+
+// ── Contact level ─────────────────────────────────────────────────────────────
+const EXEC_KW=['president','ceo','cto','cfo','coo','chief','founder','owner','partner','chairman','board','executive','director','head of','vp','vice president','evp','svp'];
+const MGMT_KW=['manager','lead','coordinator','program','project','strategy','operations','business development','account','commercial'];
+function contactLevel(t){if(!t)return'mgmt';const tl=t.toLowerCase();if(EXEC_KW.some(k=>tl.includes(k)))return'exec';if(MGMT_KW.some(k=>tl.includes(k)))return'mgmt';return'tech';}
+
+// ── Known corrections ─────────────────────────────────────────────────────────
+const CORRECTIONS=[
+  [/(?<!Prof\. )(?<!Prof\. Dr\.-Ing\. )Dr\.[ \t]+Dieter[ \t]+Gerling/g,'Prof. Dr.-Ing. Dieter Gerling'],
+  [/Founder\s*&\s*Co-Founder/g,'Founder'],
+  [/\bCo-Founder,\s*FEAAM/g,'Founder, FEAAM'],
+  [/(?<!patented )stator flux barrier motor architecture/g,'patented stator flux barrier motor architecture'],
+  [/\bsignificantly\b/g,'considerably'],
+  [/\bnovel\b/g,'advanced'],
+  [/\bI believe\b/g,'Based on your work'],
+  [/\bI think\b/g,''],
+  [/\bI noticed\b/g,''],
+  [/\bshowing promise\b/g,'demonstrated in practice'],
+  [/\bvaluable asset\b/g,'strategic capability'],
+  [/\bbattery performance\b/g,'motor efficiency and energy consumption'],
+];
+function applyCorrections(text){
+  for(const[pat,rep]of CORRECTIONS)text=text.replace(pat,rep);
+  return text.replace(/ {2,}/g,' ').replace(/\n{3,}/g,'\n\n').trim();
+}
+
+// ── Message generation ────────────────────────────────────────────────────────
+function genSubject(company,title,idx){
+  const lv=contactLevel(title);
+  if(idx===0||lv==='exec')return`Continuing FEAAM's discussion at ${company}`;
+  if(lv==='tech')return`Reduced rare-earth magnet mass for ${company}'s applications`;
+  return`FEAAM × ${company} — parallel touchpoint`;
+}
+function genBody(newFirst,newTitle,company,intName,intTitle,intLoc,idx){
+  const lv=contactLevel(newTitle);
+  const loc=intLoc?`, based in ${intLoc},`:',';
+  const ttl=intTitle?`, ${intTitle}`:'';
+  const role=newTitle?`Given your role as ${newTitle}, the topic may be of interest.`:'The topic may be of interest at the strategic level.';
+  const sig='\n\nBest regards,\nProf. Dr.-Ing. Dieter Gerling\nFounder, FEAAM GmbH';
+  if(lv==='exec'||idx===0)return applyCorrections(`Hi ${newFirst},\n\nWe've recently been in contact with your colleague ${intName}${ttl}${loc} regarding FEAAM's patented stator flux barrier motor architecture, which reduces rare-earth magnet mass while maintaining or improving torque density and efficiency.\n\n${role}\n\nOur architecture has been evaluated across applications ranging from material handling to aerospace, supported by advanced electromagnetic simulation and optimization tools developed in-house at FEAAM (a spin-off of Bundeswehr University Munich).\n\nIf useful, we'd be glad to share a complimentary Technical Analysis aligned with ${company}'s motor requirements.${sig}`);
+  if(lv==='mgmt')return applyCorrections(`Hi ${newFirst},\n\n${intName}${ttl} (based in ${intLoc}), has recently engaged with us on FEAAM's patented stator flux barrier motor architecture, which reduces rare-earth magnet mass while maintaining or improving torque density and efficiency under identical electrical and geometrical boundary conditions.\n\nIn your role as ${newTitle}, the practical implications may be of direct relevance.\n\nOur architecture has been evaluated across applications ranging from material handling to aerospace, supported by advanced electromagnetic simulation and optimization tools developed in-house at FEAAM (a spin-off of Bundeswehr University Munich).\n\nIf useful, we'd be glad to share a complimentary Technical Analysis aligned with ${company}'s motor requirements.${sig}`);
+  return applyCorrections(`Hi ${newFirst},\n\nFEAAM's patented stator flux barrier motor architecture reduces rare-earth magnet mass while maintaining or improving torque density and efficiency under identical electrical and geometrical boundary conditions.\n\nYour colleague ${intName}${ttl} has recently engaged with us on this topic. Given your background in ${newTitle}, the architecture's design and simulation methodology may be of direct technical interest.\n\nWe've evaluated it across applications ranging from material handling to aerospace and can share a complimentary Technical Analysis scoped to ${company}'s requirements.${sig}`);
+}
+function genFollowup(newFirst,company,intFirst,title,idx){
+  const lv=contactLevel(title);
+  const sig='\n\nBest regards,\nProf. Dr.-Ing. Dieter Gerling\nFounder, FEAAM GmbH';
+  if(lv==='exec'||idx===0)return`Hi ${newFirst},\n\nFollowing up briefly on my earlier note. Given the parallel discussion with ${intFirst}, the Technical Analysis can be reviewed alongside that thread without overlap.\n\nWorth a brief look on your side?${sig}`;
+  if(lv==='mgmt')return`Hi ${newFirst},\n\nA short bump on my previous note. The Technical Analysis is intended as a low-effort starting point for internal discussion and can be reviewed alongside ${intFirst}'s thread without overlap.\n\nWorth a brief look on your side?${sig}`;
+  return`Hi ${newFirst},\n\nFollowing up briefly. The architecture is patented and proven, with applications evaluated across multiple drive contexts overlapping ${company}'s portfolio.\n\nWorth a brief look on your side?${sig}`;
+}
+function formatContacts(names){if(!names.length)return'';if(names.length===1)return names[0];if(names.length===2)return`${names[0]} and ${names[1]}`;return names.slice(0,-1).join(', ')+', and '+names[names.length-1];}
+
+// ── Output reference: load columns + existing messages ────────────────────────
+let _outRefRows=null,_outRefCols=null,_outRefMessages={};
+async function loadOutputReference(){
+  _outRefRows=null;_outRefCols=null;_outRefMessages={};
+  const m=loadManifest().filter(e=>e.type==='output');
+  if(!m.length)return;
+  try{
+    const rows=await parseFile(m[0].name);
+    if(!rows.length)return;
+    _outRefCols=Object.keys(rows[0]);
+    // Index existing messages
+    const coCol=findCol(rows[0],'company');
+    const nameCol=findCol(rows[0],'new contact name')||findCol(rows[0],'new','name');
+    const subjCol=findCol(rows[0],'main body subject')||findCol(rows[0],'main','subject');
+    const bodyCol=findCol(rows[0],'main body')||findCol(rows[0],'main','body');
+    const fuSCol=findCol(rows[0],'follow','subject');
+    const fuBCol=findCol(rows[0],'follow','body');
+    if(coCol&&nameCol){
+      for(const row of rows){
+        const coKey=cleanCompany(safeStr(row[coCol]));
+        const contact=safeStr(row[nameCol]||'').toLowerCase().trim();
+        if(!coKey||!contact)continue;
+        _outRefMessages[`${coKey}|||${contact}`]={
+          subject:subjCol?safeStr(row[subjCol]):'',
+          body:bodyCol?safeStr(row[bodyCol]):'',
+          fu_subject:fuSCol?safeStr(row[fuSCol]):'',
+          fu_body:fuBCol?safeStr(row[fuBCol]):'',
+        };
+      }
+    }
+  }catch(e){console.warn('Output ref load failed:',e);}
+}
+
+const DEFAULT_COLS=['Interested Person Contacted','Interested Person Title','Interested Person Location','Interested Person Email','Company','New Contact Name','New Contact Title','New Contact Email','New Contact Location','Main Body Subject','Main Body','Follow-up Subject','Follow-up Body','Notes / Flags'];
+
+// ── Core matching engine ──────────────────────────────────────────────────────
+async function buildRows(intSource,orgSource){
+  const intRows=await parseFile(intSource);
+  const orgRows=await parseFile(orgSource);
+  if(!intRows.length)throw new Error('Interested list is empty or unreadable.');
+  if(!orgRows.length)throw new Error('Organization list is empty or unreadable.');
+
+  const intCoCol=findCol(intRows[0],'company','organization','org','employer','firm','account');
+  const orgCoCol=findCol(orgRows[0],'company','organization','org','employer','firm','account');
+  if(!intCoCol)throw new Error('No company column found in Interested list. Columns: '+Object.keys(intRows[0]).join(', '));
+  if(!orgCoCol)throw new Error('No company column found in Organization list. Columns: '+Object.keys(orgRows[0]).join(', '));
+
+  const orgTitleCol=findCol(orgRows[0],'title','position','role','designation');
+  const orgLocCol=findCol(orgRows[0],'location','city','country','region','address');
+  const orgEmailCol=findCol(orgRows[0],'email','mail');
+
+  // Build company map from interested list
+  const coMap={};
+  for(const row of intRows){
+    const coRaw=safeStr(row[intCoCol]);if(!coRaw)continue;
+    const coKey=cleanCompany(coRaw);if(!coKey)continue;
+    const name=extractName(row);if(!name)continue;
+    const titleCol=findCol(row,'title','position','role','designation');
+    const locCol=findCol(row,'location','city','country','region','address');
+    const emailCol=findCol(row,'email','mail');
+    const contact={name,title:titleCol?safeStr(row[titleCol]):'',location:locCol?safeStr(row[locCol]):'',email:emailCol?safeStr(row[emailCol]):''};
+    if(!coMap[coKey])coMap[coKey]={display:coRaw,contacts:[]};
+    if(!coMap[coKey].contacts.find(c=>c.name===name))coMap[coKey].contacts.push(contact);
+  }
+
+  const countPerCo={};const out=[];
+  for(const row of orgRows){
+    const coRaw=safeStr(row[orgCoCol]);
+    const newName=extractName(row);
+    const newFirst=newName.split(' ')[0]||'there';
+    const newTitle=orgTitleCol?safeStr(row[orgTitleCol]):'';
+    const newEmail=orgEmailCol?safeStr(row[orgEmailCol]):'';
+    const newLoc=orgLocCol?safeStr(row[orgLocCol]):'';
+    const[entry,matchType]=lookupCompany(coRaw,coMap);
+    if(!entry){out.push({int_name:'',int_title:'',int_location:'',int_email:'',company:coRaw,new_name:newName,new_title:newTitle,new_email:newEmail,new_location:newLoc,subject:'',body:'',fu_subject:'',fu_body:'',notes:'',match_type:'none',has_match:false,from_ref:false});continue;}
+    const co=coRaw||entry.display;
+    const coKey=cleanCompany(coRaw)||cleanCompany(entry.display);
+    const idx=countPerCo[coKey]||0;countPerCo[coKey]=idx+1;
+    const primary=entry.contacts[0];
+    const intNamesStr=formatContacts(entry.contacts.map(c=>c.name));
+    // Check output reference for existing message
+    const refKey=`${coKey}|||${newName.toLowerCase().trim()}`;
+    let subject,body,fuSubject,fuBody,fromRef=false;
+    if(_outRefMessages[refKey]&&_outRefMessages[refKey].body){
+      const m=_outRefMessages[refKey];subject=m.subject;body=m.body;fuSubject=m.fu_subject;fuBody=m.fu_body;fromRef=true;
+    }else{
+      subject=genSubject(co,newTitle,idx);
+      body=genBody(newFirst,newTitle,co,intNamesStr,primary.title,primary.location,idx);
+      fuSubject=`Re: ${subject}`;
+      fuBody=genFollowup(newFirst,co,primary.name.split(' ')[0],newTitle,idx);
+    }
+    out.push({int_name:intNamesStr,int_title:primary.title,int_location:primary.location,int_email:primary.email,company:co,new_name:newName,new_title:newTitle,new_email:newEmail,new_location:newLoc,subject,body,fu_subject:fuSubject,fu_body:fuBody,notes:fromRef?'✓ from reference':'',match_type:matchType,has_match:true,from_ref:fromRef});
+  }
+  return out;
+}
+
+function rowsToSheetData(rows){
+  const cols=_outRefCols||DEFAULT_COLS;
+  function match(must,mustNot=[]){for(const c of cols){const cl=c.toLowerCase();if(must.every(w=>cl.includes(w))&&!mustNot.some(w=>cl.includes(w)))return c;}return null;}
+  const cIN=match(['interested','person','contacted'])||match(['interested','person'])||match(['interested']);
+  const cIT=match(['interested','title']);const cIL=match(['interested','location']);const cIE=match(['interested','email']);
+  const cCo=match(['company']);const cNN=match(['new','contact','name']);const cNT=match(['new','contact','title']);
+  const cNE=match(['new','contact','email']);const cNL=match(['new','contact','location']);
+  const cSu=match(['main','body','subject']);const cBo=match(['main','body'],['subject']);
+  const cFS=cols.find(c=>c.toLowerCase().includes('follow')&&c.toLowerCase().includes('subject'))||null;
+  const cFB=cols.find(c=>c.toLowerCase().includes('follow')&&!c.toLowerCase().includes('subject'))||null;
+  const cNo=match(['notes'])||match(['flags']);
+  return rows.map(r=>{
+    const o={};
+    if(cIN)o[cIN]=r.int_name;if(cIT)o[cIT]=r.int_title;if(cIL)o[cIL]=r.int_location;if(cIE)o[cIE]=r.int_email;
+    if(cCo)o[cCo]=r.company;if(cNN)o[cNN]=r.new_name;if(cNT)o[cNT]=r.new_title;if(cNE)o[cNE]=r.new_email;if(cNL)o[cNL]=r.new_location;
+    if(cSu)o[cSu]=r.subject;if(cBo)o[cBo]=r.body;if(cFS)o[cFS]=r.fu_subject;if(cFB)o[cFB]=r.fu_body;if(cNo)o[cNo]=r.notes;
+    // fill any missing cols with empty
+    for(const c of cols)if(!(c in o))o[c]='';
+    return o;
+  });
+}
+
+function downloadExcelFile(sheetData,cols,filename,sheetName){
+  const ws=XLSX.utils.json_to_sheet(sheetData,{header:cols});
+  // Column widths
+  const colW=cols.map(c=>{
+    const cl=c.toLowerCase();
+    if(cl.includes('body')&&!cl.includes('subject'))return{wch:60};
+    if(cl.includes('subject'))return{wch:44};
+    if(cl.includes('name')||cl.includes('company'))return{wch:26};
+    if(cl.includes('title'))return{wch:34};
+    if(cl.includes('email'))return{wch:28};
+    return{wch:20};
+  });
+  ws['!cols']=colW;
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,sheetName||'Sheet1');
+  XLSX.writeFile(wb,filename);
+}
+
+// ── UI State ──────────────────────────────────────────────────────────────────
+let intSource=null,orgSource=null,dedupRefSource=null;
+let otherUploadedFiles=[],othersRefNames=new Set();
+let lastRows=null,lastDedupRef=null;
+let activeRefTab='reference';
+
+// ── UI Helpers ────────────────────────────────────────────────────────────────
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function fmtSize(b){if(!b)return'0 B';if(b<1024)return b+' B';if(b<1048576)return(b/1024).toFixed(1)+' KB';return(b/1048576).toFixed(1)+' MB';}
+function fmtDate(s){if(!s)return'';try{return new Date(s).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});}catch{return s;}}
+function showStatus(id,msg,type){const el=document.getElementById(id);el.textContent=msg;el.className='status-bar '+type;}
+function hideStatus(id){document.getElementById(id).className='status-bar hidden';}
+function fileIcon(n){const e=(n||'').split('.').pop().toLowerCase();if(e==='pdf')return'PDF';if(e==='docx'||e==='doc')return'DOC';if(e==='csv')return'CSV';return'XLS';}
+
+function renderReferenceFiles(){
+  const all=loadManifest();
+  const refFiles=all.filter(f=>!f.type||f.type==='reference');
+  const outFiles=all.filter(f=>f.type==='output');
+  renderGrid(refFiles,'refFileGrid','refEmpty');
+  renderGrid(outFiles,'outRefFileGrid','outRefEmpty');
+  syncSelects(refFiles);
+}
+
+function renderGrid(files,gridId,emptyId){
+  const grid=document.getElementById(gridId);const empty=document.getElementById(emptyId);
+  [...grid.querySelectorAll('.ref-file-card')].forEach(c=>c.remove());
+  if(!files.length){empty.style.display='';return;}
+  empty.style.display='none';
+  for(const f of files){
+    const card=document.createElement('div');card.className='ref-file-card';
+    card.innerHTML=`<div class="ref-file-icon">${fileIcon(f.name)}</div><div class="ref-file-info"><div class="ref-file-name" title="${esc(f.original_name||f.name)}">${esc(f.original_name||f.name)}</div><div class="ref-file-meta">${fmtSize(f.size)} &middot; ${fmtDate(f.uploaded_at)}</div></div><div class="ref-file-delete" onclick="deleteRefFile('${f.name}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></div>`;
+    grid.appendChild(card);
+  }
+}
+
+function syncSelects(files){
+  for(const id of['intRefSelect','orgRefSelect','dedupRefSelect']){
+    const sel=document.getElementById(id);const cur=sel.value;
+    sel.innerHTML='<option value="">&#8212; Select from Reference Files &#8212;</option>';
+    for(const f of files){const o=document.createElement('option');o.value=f.name;o.textContent=f.original_name||f.name;if(f.name===cur)o.selected=true;sel.appendChild(o);}
+  }
+  const cl=document.getElementById('othersRefChecklist');cl.innerHTML='';
+  if(!files.length){cl.innerHTML='<div style="font-size:11px;color:var(--muted)">No reference files yet</div>';return;}
+  for(const f of files){
+    const lbl=document.createElement('label');lbl.className='ref-check-item'+(othersRefNames.has(f.name)?' checked':'');
+    lbl.innerHTML=`<input type="checkbox" ${othersRefNames.has(f.name)?'checked':''} onchange="toggleOtherRef('${f.name}',this.checked,this.parentElement)"/><span>${esc(f.original_name||f.name)}</span>`;
+    cl.appendChild(lbl);
+  }
+}
+
+function switchRefTab(tab){
+  activeRefTab=tab;
+  document.getElementById('tabRefFiles').classList.toggle('active',tab==='reference');
+  document.getElementById('tabOutRef').classList.toggle('active',tab==='output');
+  document.getElementById('refGlobalDrop').classList.toggle('hidden',tab!=='reference');
+  document.getElementById('outRefGlobalDrop').classList.toggle('hidden',tab!=='output');
+}
+
+async function uploadRefFiles(input){
+  for(const f of Array.from(input.files))await saveRefFile(f,activeRefTab);
+  renderReferenceFiles();input.value='';
+  if(activeRefTab==='output')await loadOutputReference();
+}
+
+function onRefDragOver(e){e.preventDefault();document.getElementById('refGlobalDrop').classList.add('drag-over');}
+function onRefDragLeave(){document.getElementById('refGlobalDrop').classList.remove('drag-over');}
+async function onRefDrop(e){e.preventDefault();onRefDragLeave();for(const f of Array.from(e.dataTransfer.files))await saveRefFile(f,'reference');renderReferenceFiles();}
+function onOutRefDragOver(e){e.preventDefault();document.getElementById('outRefGlobalDrop').classList.add('drag-over');}
+function onOutRefDragLeave(){document.getElementById('outRefGlobalDrop').classList.remove('drag-over');}
+async function onOutRefDrop(e){
+  e.preventDefault();onOutRefDragLeave();
+  for(const f of Array.from(e.dataTransfer.files))await saveRefFile(f,'output');
+  renderReferenceFiles();await loadOutputReference();
+}
+
+function onRefSelectChange(selId,zoneId,metaId){
+  const val=document.getElementById(selId).value;
+  if(selId==='intRefSelect')intSource=val||null;
+  if(selId==='orgRefSelect')orgSource=val||null;
+  if(selId==='dedupRefSelect')dedupRefSource=val||null;
+  const zone=document.getElementById(zoneId);const meta=document.getElementById(metaId);
+  if(val){zone.classList.add('has-file');meta.textContent='✓ Using reference file';meta.classList.add('show');}
+  else{zone.classList.remove('has-file');meta.classList.remove('show');}
+}
+function toggleOtherRef(name,checked,lbl){if(checked){othersRefNames.add(name);lbl.classList.add('checked');}else{othersRefNames.delete(name);lbl.classList.remove('checked');}}
+
+function onDragOver(e,id){e.preventDefault();document.getElementById(id).classList.add('drag-over');}
+function onDragLeave(id){document.getElementById(id).classList.remove('drag-over');}
+function onDrop(e,inputId,zoneId,metaId){
+  e.preventDefault();onDragLeave(zoneId);
+  const file=e.dataTransfer.files[0];if(file)setFile(inputId,zoneId,metaId,file);
+}
+function onDropMulti(e,zoneId){
+  e.preventDefault();onDragLeave(zoneId);
+  Array.from(e.dataTransfer.files).filter(f=>/\.(xlsx?|csv)$/i.test(f.name)).forEach(f=>addOtherFile(f));
+  renderOtherFiles();
+}
+function onFileSelect(inputId,metaId,zoneId,selId){
+  const input=document.getElementById(inputId);if(!input.files[0])return;
+  setFile(inputId,zoneId,metaId,input.files[0]);
+  document.getElementById(selId).value='';
+  if(selId==='intRefSelect')intSource=null;if(selId==='orgRefSelect')orgSource=null;if(selId==='dedupRefSelect')dedupRefSource=null;
+}
+function onMultiFileSelect(input){Array.from(input.files).forEach(f=>addOtherFile(f));renderOtherFiles();}
+function setFile(inputId,zoneId,metaId,file){
+  document.getElementById(metaId).textContent=`${file.name}  (${fmtSize(file.size)})`;
+  document.getElementById(metaId).classList.add('show');
+  document.getElementById(zoneId).classList.add('has-file');
+  if(inputId==='intFile')intSource=file;
+  if(inputId==='orgFile')orgSource=file;
+  if(inputId==='dedupRefFile')dedupRefSource=file;
+}
+function addOtherFile(file){if(!otherUploadedFiles.find(f=>f.name===file.name))otherUploadedFiles.push(file);}
+function removeOtherFile(name){otherUploadedFiles=otherUploadedFiles.filter(f=>f.name!==name);renderOtherFiles();}
+function renderOtherFiles(){
+  const list=document.getElementById('othersFileList');
+  list.innerHTML=otherUploadedFiles.map(f=>`<div class="file-pill"><span class="file-pill-name">${esc(f.name)}</span><span class="file-pill-remove" onclick="removeOtherFile('${esc(f.name)}')">&#10005;</span></div>`).join('');
+  const meta=document.getElementById('othersMeta');
+  if(otherUploadedFiles.length){meta.textContent=`${otherUploadedFiles.length} file(s) selected`;meta.classList.add('show');}
+  else meta.classList.remove('show');
+  if(otherUploadedFiles.length)document.getElementById('othersDrop').classList.add('has-file');
+}
+
+// ── Message Generator ─────────────────────────────────────────────────────────
+async function runPreview(){
+  if(!intSource||!orgSource){showStatus('msgStatus','Please select or upload both lists.','error');return;}
+  showStatus('msgStatus','Processing…','loading');
+  const btn=document.querySelector('button[onclick="runPreview()"]');btn.classList.add('loading');
+  try{
+    await loadOutputReference();
+    lastRows=await buildRows(intSource,orgSource);
+    btn.classList.remove('loading');hideStatus('msgStatus');
+    renderPreview(lastRows);
+    document.getElementById('msgDownloadBtn').disabled=false;
+  }catch(e){btn.classList.remove('loading');showStatus('msgStatus','Error: '+e.message,'error');}
+}
+
+function renderPreview(rows){
+  const matched=rows.filter(r=>r.has_match).length;
+  const fromRef=rows.filter(r=>r.from_ref).length;
+  const total=rows.length;
+  document.getElementById('msgStats').innerHTML=
+    `<div class="stat-chip info"><span class="sc-label">Total</span><span class="sc-val">${total}</span></div>`+
+    `<div class="stat-chip good"><span class="sc-label">Matched</span><span class="sc-val">${matched}</span></div>`+
+    `<div class="stat-chip warn"><span class="sc-label">No Match</span><span class="sc-val">${total-matched}</span></div>`+
+    `<div class="stat-chip good"><span class="sc-label">Match Rate</span><span class="sc-val">${total?Math.round(matched/total*100):0}%</span></div>`+
+    (fromRef?`<div class="stat-chip info"><span class="sc-label">From Ref</span><span class="sc-val">${fromRef}</span></div>`:'');
+  document.getElementById('msgTbody').innerHTML=rows.slice(0,100).map(r=>{
+    const badge=r.match_type==='none'?'<span class="badge badge-none">&mdash;</span>':r.match_type==='exact'?'<span class="badge badge-exact">Exact</span>':`<span class="badge badge-fuzzy">${esc(r.match_type)}</span>`;
+    const refTag=r.from_ref?' <span class="badge badge-ref">ref</span>':'';
+    return`<tr class="${r.from_ref?'row-ref':r.has_match?'row-match':''}">
+      <td>${esc(r.int_name)}</td><td>${esc(r.company)}</td><td>${esc(r.new_name)}</td>
+      <td>${esc(r.new_title)}</td><td>${badge}${refTag}</td>
+      <td>${esc(r.subject)}</td><td style="color:var(--muted2);font-style:italic">${esc((r.body||'').slice(0,120))}…</td>
+      <td>${esc(r.fu_subject)}</td><td style="color:var(--muted2);font-style:italic">${esc((r.fu_body||'').slice(0,120))}…</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('msgNote').textContent=total>100?`Showing first 100 of ${total} rows.`:`All ${total} rows shown.`;
+  document.getElementById('msgPreviewArea').classList.remove('hidden');
+}
+
+async function runDownload(){
+  if(!lastRows){showStatus('msgStatus','Run Preview first.','error');return;}
+  showStatus('msgStatus','Generating Excel…','loading');
+  try{
+    const cols=_outRefCols||DEFAULT_COLS;
+    const sheetData=rowsToSheetData(lastRows);
+    downloadExcelFile(sheetData,cols,'FEAAM_Outreach_Messages.xlsx','FEAAM Outreach');
+    hideStatus('msgStatus');showStatus('msgStatus','Downloaded successfully!','success');
+  }catch(e){showStatus('msgStatus','Error: '+e.message,'error');}
+}
+
+// ── Deduplication ─────────────────────────────────────────────────────────────
+async function extractKeys(source){
+  const rows=await parseFile(source);
+  const emails=new Set(),names=new Set();
+  if(!rows.length)return{emails,names};
+  const eCol=findCol(rows[0],'email','mail');
+  const nCol=findCol(rows[0],'full name','fullname','name');
+  for(const r of rows){
+    if(eCol){const v=safeStr(r[eCol]).toLowerCase();if(v)emails.add(v);}
+    if(nCol){const v=safeStr(r[nCol]).toLowerCase();if(v)names.add(v);}
+  }
+  return{emails,names};
+}
+
+async function runDedupPreview(){
+  if(!dedupRefSource){showStatus('dedupStatus','Please select or upload a Reference Sheet.','error');return;}
+  const hasOthers=othersRefNames.size||otherUploadedFiles.length;
+  if(!hasOthers){showStatus('dedupStatus','Please select or upload at least one Other Sheet.','error');return;}
+  showStatus('dedupStatus','Checking duplicates…','loading');
+  try{
+    const refRows=await parseFile(dedupRefSource);
+    const allEmails=new Set(),allNames=new Set();
+    for(const n of othersRefNames){const k=await extractKeys(n);k.emails.forEach(v=>allEmails.add(v));k.names.forEach(v=>allNames.add(v));}
+    for(const f of otherUploadedFiles){const k=await extractKeys(f);k.emails.forEach(v=>allEmails.add(v));k.names.forEach(v=>allNames.add(v));}
+    lastDedupRef={refRows,allEmails,allNames};
+    const eCol=findCol(refRows[0],'email','mail');
+    const nCol=findCol(refRows[0],'full name','fullname','name');
+    const dups=[];
+    for(const r of refRows){
+      let isDup=false,reason='';
+      if(eCol){const e=safeStr(r[eCol]).toLowerCase();if(e&&allEmails.has(e)){isDup=true;reason='Email match';}}
+      if(!isDup&&nCol){const n=safeStr(r[nCol]).toLowerCase();if(n&&allNames.has(n)){isDup=true;reason='Name match';}}
+      if(isDup)dups.push({name:nCol?safeStr(r[nCol]):'',email:eCol?safeStr(r[eCol]):'',reason});
+    }
+    hideStatus('dedupStatus');
+    renderDedupPreview(refRows.length,dups);
+    document.getElementById('dedupDownloadBtn').disabled=false;
+  }catch(e){showStatus('dedupStatus','Error: '+e.message,'error');}
+}
+
+function renderDedupPreview(total,dups){
+  const pct=total?Math.round(dups.length/total*100):0;
+  document.getElementById('dedupStats').innerHTML=
+    `<div class="stat-chip info"><span class="sc-label">Reference Rows</span><span class="sc-val">${total}</span></div>`+
+    `<div class="stat-chip ${dups.length?'bad':'good'}"><span class="sc-label">Duplicates</span><span class="sc-val">${dups.length}</span></div>`+
+    `<div class="stat-chip good"><span class="sc-label">Unique</span><span class="sc-val">${total-dups.length}</span></div>`+
+    `<div class="stat-chip ${pct>20?'bad':'warn'}"><span class="sc-label">Dup Rate</span><span class="sc-val">${pct}%</span></div>`;
+  const dupArea=document.getElementById('dedupDupArea');
+  if(!dups.length){dupArea.classList.add('hidden');}
+  else{
+    dupArea.classList.remove('hidden');
+    document.getElementById('dedupTbody').innerHTML=dups.slice(0,50).map(d=>`<tr class="row-dup"><td>${esc(d.name)}</td><td>${esc(d.email)}</td><td><span class="badge badge-dup">${esc(d.reason)}</span></td></tr>`).join('');
+  }
+  document.getElementById('dedupPreviewArea').classList.remove('hidden');
+}
+
+async function runDedupDownload(){
+  if(!lastDedupRef){showStatus('dedupStatus','Run Check first.','error');return;}
+  showStatus('dedupStatus','Generating report…','loading');
+  try{
+    const{refRows,allEmails,allNames}=lastDedupRef;
+    const eCol=findCol(refRows[0],'email','mail');
+    const nCol=findCol(refRows[0],'full name','fullname','name');
+    const out=refRows.map(r=>{
+      let status='Unique',reason='';
+      if(eCol){const e=safeStr(r[eCol]).toLowerCase();if(e&&allEmails.has(e)){status='Duplicate';reason='Email match';}}
+      if(status==='Unique'&&nCol){const n=safeStr(r[nCol]).toLowerCase();if(n&&allNames.has(n)){status='Duplicate';reason='Name match';}}
+      return{...r,Status:status,'Match Reason':reason};
+    });
+    const cols=[...Object.keys(refRows[0]),'Status','Match Reason'];
+    downloadExcelFile(out,cols,'FEAAM_Deduplication.xlsx','Deduplication');
+    hideStatus('dedupStatus');showStatus('dedupStatus','Downloaded!','success');
+  }catch(e){showStatus('dedupStatus','Error: '+e.message,'error');}
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+waitForXLSX(async()=>{
+  renderReferenceFiles();
+  await loadOutputReference();
+});
+</script>
+</body>
+</html>
